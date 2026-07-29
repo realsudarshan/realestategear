@@ -24,8 +24,7 @@ function getResend(): Resend | null {
 }
 
 function getFromEmail(): string {
-  const customFrom = process.env.EMAIL_FROM;
-  return customFrom ? customFrom : 'Real Estate Gear <notifications@realestategear.com>';
+  return process.env.EMAIL_FROM ?? 'Real Estate Gear <notifications@realestategear.com>';
 }
 
 function getReplyToEmail(): string | undefined {

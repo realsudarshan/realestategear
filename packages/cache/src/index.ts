@@ -11,19 +11,12 @@ type TtlMap = {
   session: number;
 };
 
-function getErrorMessage(error: unknown): string {
-  if (error instanceof Error) {
-    return error.message;
-  }
-  return String(error);
+function getErrorMessage(error: unknown) {
+  return error instanceof Error ? error.message : String(error);
 }
 
-function hasErrorCode(error: unknown, code: string): boolean {
-  return Boolean(
-    error instanceof Error &&
-    'code' in error &&
-    (error as { code?: unknown }).code === code
-  );
+function hasErrorCode(error: unknown, code: string) {
+  return error instanceof Error && 'code' in error && error.code === code;
 }
 
 class CacheManager {
