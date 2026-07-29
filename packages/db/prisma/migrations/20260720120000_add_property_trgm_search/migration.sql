@@ -1,0 +1,7 @@
+-- Intentionally portable no-op.
+--
+-- Trigram indexes improve ILIKE search performance but require permission to
+-- install the optional pg_trgm extension. Requiring that privilege in the core
+-- migration chain prevents otherwise valid PostgreSQL deployments from
+-- starting. Privileged operators can apply scripts/enable-trigram-search.sql
+-- after the normal migrations complete.

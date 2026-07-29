@@ -1,0 +1,188 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-realestategear}
+      POSTGRES_USER: ${POSTGRES_USER:-realestategear}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me-before-production}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+    restart: unless-stopped
+
+  migrate:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-realestategear}:${POSTGRES_PASSWORD:-change-me-before-production}@postgres:5432/${POSTGRES_DB:-realestategear}?schema=public
+    command: ["npm", "run", "db:migrate", "--workspace=db"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    environment:
+      NODE_ENV: production
+      API_PORT: 3001
+      DATABASE_URL: postgresql://${POSTGRES_USER:-realestategear}:${POSTGRES_PASSWORD:-change-me-before-production}@postgres:5432/${POSTGRES_DB:-realestategear}?schema=public
+      JWT_SECRET: ${JWT_SECRET:-replace-with-a-long-random-value}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3006}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:3006}
+      AGENT_API_ENABLED: "false"
+      BOOTSTRAP_ADMIN_ENABLED: "false"
+      REDIS_ENABLED: ${REDIS_ENABLED:-false}
+      REDIS_HOST: ${REDIS_HOST:-redis}
+      REDIS_PORT: ${REDIS_PORT:-6379}
+      TYPESENSE_HOST: ${TYPESENSE_HOST:-}
+      TYPESENSE_PORT: ${TYPESENSE_PORT:-8108}
+      TYPESENSE_PROTOCOL: ${TYPESENSE_PROTOCOL:-http}
+      TYPESENSE_API_KEY: ${TYPESENSE_API_KEY:-}
+      STORAGE_ENDPOINT: ${STORAGE_ENDPOINT:-}
+      STORAGE_BUCKET: ${STORAGE_BUCKET:-}
+      STORAGE_ACCESS_KEY: ${STORAGE_ACCESS_KEY:-}
+      STORAGE_SECRET_KEY: ${STORAGE_SECRET_KEY:-}
+      STORAGE_PUBLIC_BASE_URL: ${STORAGE_PUBLIC_BASE_URL:-}
+    ports:
+      - "${API_PORT:-3001}:3001"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3001/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+    restart: unless-stopped
+
+  portal:
+    build:
+      context: .
+      dockerfile: apps/portal/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://api:3001}
+    environment:
+      API_INTERNAL_URL: http://api:3001
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://api:3001}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3006}
+    ports:
+      - "${PORTAL_PORT:-3006}:3006"
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3006/').then(r=>{if(r.status>=500)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    restart: unless-stopped
+
+  mls:
+    profiles: ["mls"]
+    build:
+      context: .
+      dockerfile: apps/mls-service/Dockerfile
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${POSTGRES_USER:-realestategear}:${POSTGRES_PASSWORD:-change-me-before-production}@postgres:5432/${POSTGRES_DB:-realestategear}?schema=public
+      MLS_AUTH_TYPE: ${MLS_AUTH_TYPE:-}
+      MLS_BASE_URL: ${MLS_BASE_URL:-}
+      MLS_ACCESS_TOKEN: ${MLS_ACCESS_TOKEN:-}
+      MLS_OAUTH_TOKEN_URL: ${MLS_OAUTH_TOKEN_URL:-}
+      MLS_OAUTH_CLIENT_ID: ${MLS_OAUTH_CLIENT_ID:-}
+      MLS_OAUTH_CLIENT_SECRET: ${MLS_OAUTH_CLIENT_SECRET:-}
+      MLS_OAUTH_SCOPE: ${MLS_OAUTH_SCOPE:-}
+      MLS_BOARD_ID: ${MLS_BOARD_ID:-}
+      MLS_BOARD_SCOPE_FIELD: ${MLS_BOARD_SCOPE_FIELD:-}
+      MLS_BOARD_SCOPE_VALUE: ${MLS_BOARD_SCOPE_VALUE:-}
+      MLS_PREFIX: ${MLS_PREFIX:-}
+      MLS_PROVIDER_ID: ${MLS_PROVIDER_ID:-mls}
+      MLS_PUBLIC_DISPLAY_ENABLED: ${MLS_PUBLIC_DISPLAY_ENABLED:-false}
+      MLS_SYNC_ENABLED: ${MLS_SYNC_ENABLED:-false}
+      TYPESENSE_HOST: ${TYPESENSE_HOST:-}
+      TYPESENSE_PORT: ${TYPESENSE_PORT:-8108}
+      TYPESENSE_PROTOCOL: ${TYPESENSE_PROTOCOL:-http}
+      TYPESENSE_API_KEY: ${TYPESENSE_API_KEY:-}
+      STORAGE_ENDPOINT: ${STORAGE_ENDPOINT:-}
+      STORAGE_BUCKET: ${STORAGE_BUCKET:-}
+      STORAGE_ACCESS_KEY: ${STORAGE_ACCESS_KEY:-}
+      STORAGE_SECRET_KEY: ${STORAGE_SECRET_KEY:-}
+      STORAGE_PUBLIC_BASE_URL: ${STORAGE_PUBLIC_BASE_URL:-}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  minio:
+    profiles: ["storage"]
+    image: minio/minio:RELEASE.2025-09-07T16-13-09Z
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-replace-with-a-minio-user}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-replace-with-a-minio-password}
+    ports:
+      - "${MINIO_PORT:-9000}:9000"
+      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+
+  typesense:
+    profiles: ["search"]
+    build:
+      context: apps/typesense
+      dockerfile: Dockerfile
+    environment:
+      TYPESENSE_API_KEY: ${TYPESENSE_API_KEY:-replace-with-a-typesense-key}
+    ports:
+      - "${TYPESENSE_PORT:-8108}:8108"
+    volumes:
+      - typesense-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8109/health | grep -q '\"ok\":true'"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+
+  redis:
+    profiles: ["cache"]
+    image: redis:7.4-alpine
+    command: redis-server --appendonly yes
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+volumes:
+  postgres-data:
+  minio-data:
+  typesense-data:
+  redis-data:

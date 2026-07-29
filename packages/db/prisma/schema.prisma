@@ -1,0 +1,1638 @@
+// schema.prisma - PostgreSQL production database
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─────────────── Enums ───────────────
+
+enum MemberRole {
+  OWNER
+  AGENT
+  ASSISTANT
+}
+
+enum PropertyType {
+  SINGLE_FAMILY
+  CONDO
+  TOWNHOUSE
+  MULTI_FAMILY
+  LAND
+  COMMERCIAL
+}
+
+enum ListingSource {
+  MLS
+  MANUAL
+  ZILLOW
+  REALTOR_COM
+}
+
+enum ListingStatus {
+  ACTIVE
+  PENDING
+  SOLD
+  WITHDRAWN
+  EXPIRED
+  COMING_SOON
+}
+
+enum AIActionStatus {
+  PENDING
+  APPROVED
+  EXECUTING
+  EXECUTED
+  SENT
+  DISMISSED
+  SNOOZED
+  FAILED
+  EXPIRED
+}
+
+enum EventType {
+  HOME_TOUR
+  BUYER_CONSULTATION
+  LISTING_CONSULTATION
+  MEETING
+  INSPECTION
+  WALKTHROUGH
+  CLOSING
+  APPRAISAL
+  OTHER
+}
+
+enum EventStatus {
+  SCHEDULED
+  COMPLETED
+  CANCELLED
+}
+
+enum InquirySource {
+  PORTAL_ANONYMOUS
+  PORTAL_AUTHENTICATED
+}
+
+enum InquiryStatus {
+  NEW
+  READ
+  RESPONDED
+  ARCHIVED
+}
+
+enum InquiryDeliveryState {
+  PENDING
+  PROCESSING
+  RETRY
+  DELIVERED
+  DEAD_LETTER
+}
+
+enum ClassificationDecision {
+  POSITIVE
+  NEGATIVE
+}
+
+enum ClassificationSource {
+  INGESTION
+  RECLASSIFICATION
+  MANUAL
+}
+
+enum CollectionOverrideDecision {
+  INCLUDE
+  EXCLUDE
+}
+
+enum ClassificationRunMode {
+  CHECK
+  DIFF
+  APPLY
+}
+
+enum ClassificationRunStatus {
+  RUNNING
+  COMPLETED
+  FAILED
+}
+
+// ─────────────── Account & Members ───────────────
+
+model Account {
+  id        String   @id @default(cuid())
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  members           AccountMember[]
+  users             User[]
+  emailDeliveries   EmailDelivery[]
+  portals           Portal[]
+  contacts          Contact[]
+  transactions      Transaction[]
+  tasks             Task[]
+  geographicAreas   GeographicArea[]
+  classifications   PropertyClassification[]
+  classificationRuns ClassificationRun[]
+  mlsAccess         AccountMlsAccess[]
+  listings          Listing[] // MANUAL-source listings only
+  inquiries         Inquiry[]
+  inquiryDeliveries InquiryDelivery[]
+}
+
+model AccountMember {
+  id        String     @id @default(cuid())
+  accountId String
+  account   Account    @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role      MemberRole @default(OWNER)
+
+  assignedContacts Contact[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([accountId, userId])
+  @@index([accountId])
+  @@index([userId])
+}
+
+model AccountMlsAccess {
+  id           String    @id @default(cuid())
+  accountId    String
+  account      Account   @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  mlsBoardId   String
+  membershipId String
+  verifiedAt   DateTime?
+  createdAt    DateTime  @default(now())
+
+  // Set by the daily mls-status-check cron when the roster shows this
+  // membership's agent has gone inactive; cleared automatically if a later
+  // run finds them active again. Grace period is read as "time since
+  // flagged" (no fixed deadline) — see issue #205.
+  flaggedInactiveAt DateTime?
+
+  @@unique([accountId, mlsBoardId])
+  @@index([accountId])
+}
+
+// ─────────────── Portal, Areas & Collections ───────────────
+
+model Portal {
+  id                String  @id @default(cuid())
+  name              String
+  slug              String  @unique
+  customDomain      String? @unique
+  accountId         String
+  account           Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  themePresetId     String  @default("classic")
+  logoUrl           String?
+  agentDisplayName  String?
+  agentPhone        String?
+  agentEmail        String?
+  agentHeadlineText String?
+  isActive          Boolean @default(false)
+
+  // Brokerage / IDX compliance. brokerageName + brokeragePhone display in the
+  // portal footer per most IDX licensing agreements; both required to activate.
+  brokerageName  String?
+  brokeragePhone String?
+
+  // Set when the test-inquiry flow successfully delivered a routing test to the
+  // agent's email. Used by the launch checklist to gate activation.
+  contactRoutingVerifiedAt DateTime?
+
+  // Manual admin action (never automatic — see issue #205), set when a
+  // portal is pulled for MLS compliance (e.g. the owning agent went
+  // inactive with their broker past the grace period). Kept distinct from
+  // isActive so the public site can tell "never launched" apart from "was
+  // live, suspended" and render the right state for each.
+  suspendedAt DateTime?
+
+  collections      ListingCollection[]
+  featuredListings PortalFeaturedListing[]
+  inquiries        Inquiry[]
+  users            User[]
+  domains          PortalDomain[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([accountId])
+  @@index([isActive])
+  @@index([accountId, isActive])
+}
+
+enum PortalDomainKind {
+  APEX
+  WWW
+  SUBDOMAIN
+}
+
+enum PortalDomainStatus {
+  PENDING
+  VERIFIED
+  SSL_PENDING
+  ACTIVE
+  FAILED
+  REMOVED
+}
+
+// Verified custom domains for a portal. Distinct from Portal.customDomain
+// (a raw, unverified @unique field kept for now — see docs/plans/PORTAL_PLATFORM_PLAN.md
+// "Open Decisions"). A hostname only routes real traffic once it reaches
+// ACTIVE here; nothing reads Portal.customDomain to authorize routing.
+model PortalDomain {
+  id       String             @id @default(cuid())
+  portalId String
+  portal   Portal             @relation(fields: [portalId], references: [id], onDelete: Cascade)
+  hostname String             @unique
+  kind     PortalDomainKind
+  status   PortalDomainStatus @default(PENDING)
+
+  // DNS TXT ownership proof, checked at "_realestategear-challenge.<hostname>".
+  // Not a secret post-verification, but not returned by public endpoints.
+  verificationToken String
+
+  // 'manual' (DNS TXT verification, implemented) | 'cloudflare_for_saas'
+  // (reserved for the future SSL-automation path in the platform plan, not
+  // wired up yet). Plain string, not an enum, so adding a provider doesn't
+  // need a migration — same reasoning as Account.plan.
+  provider String @default("manual")
+
+  // At most one canonical domain per portal, enforced in portalDomainService
+  // (transactional unset-then-set) rather than a DB constraint — Prisma has
+  // no declarative partial-unique-index support, and a hand-maintained one
+  // here would drift silently from this file.
+  canonical Boolean @default(false)
+
+  createdAt   DateTime  @default(now())
+  verifiedAt  DateTime?
+  activatedAt DateTime?
+  removedAt   DateTime?
+
+  @@index([portalId])
+  @@index([status])
+}
+
+model GeographicArea {
+  id          String  @id @default(cuid())
+  accountId   String
+  account     Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  slug        String
+  name        String
+  description String?
+  definition  Json
+  isPublished Boolean @default(false)
+  position    Int     @default(0)
+
+  memberships PropertyAreaMembership[]
+  inquiries   Inquiry[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([accountId, slug])
+  @@index([accountId, isPublished, position])
+}
+
+model ListingCollection {
+  id          String  @id @default(cuid())
+  portalId    String
+  portal      Portal  @relation(fields: [portalId], references: [id], onDelete: Cascade)
+  slug        String
+  name        String
+  description String?
+  predicate   Json
+  isPublished Boolean @default(false)
+  position    Int     @default(0)
+
+  overrides CollectionManualOverride[]
+  inquiries Inquiry[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([portalId, slug])
+  @@index([portalId, isPublished, position])
+}
+
+model CollectionManualOverride {
+  id           String                     @id @default(cuid())
+  collectionId String
+  collection   ListingCollection          @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  propertyId   String
+  property     Property                   @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  decision     CollectionOverrideDecision
+  reason       String?
+  createdById  String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([collectionId, propertyId])
+  @@index([propertyId, decision])
+}
+
+// ─────────────── Property & Listings ───────────────
+
+/// Physical asset — address, specs, media. Does not change between listing periods.
+model Property {
+  id        String  @id @default(cuid())
+  address   String
+  city      String
+  state     String
+  zipCode   String
+  latitude  Float?
+  longitude Float?
+  parcelId  String? @unique
+
+  propertyType PropertyType?
+  bedrooms     Int?
+  bathrooms    Float?
+  squareFeet   Int?
+  lotSize      Float?
+  yearBuilt    Int?
+
+  // MLS-sourced. RESO's SubdivisionName is per-listing because RESO has no
+  // Property entity; we do. MLS ingest copies rawData.SubdivisionName here on
+  // first upsert. Dirty in raw form (case variants, abbreviations) — needs a
+  // normalization pass when MLS data lands (tracked in TODOS.md).
+  subdivision String?
+  normalizedAttributes Json @default("{}")
+
+  // MLS Grid PhotosChangeTimestamp last ingested — lets the media sync skip
+  // re-downloading photos that haven't changed (decision D7 / Codex #9).
+  photosSyncedAt DateTime?
+
+  listings     Listing[]
+  media        Media[]
+  events       Event[]
+  notes        Note[]
+  aiActions    AIAction[]
+  transactions Transaction[]
+  areaMemberships PropertyAreaMembership[]
+  classifications PropertyClassification[]
+  collectionOverrides CollectionManualOverride[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([city, state])
+  @@index([city, subdivision])
+  @@index([latitude, longitude])
+  @@index([propertyType, bedrooms, bathrooms, squareFeet])
+}
+
+model PropertyAreaMembership {
+  id          String                 @id @default(cuid())
+  areaId      String
+  area        GeographicArea         @relation(fields: [areaId], references: [id], onDelete: Cascade)
+  propertyId  String
+  property    Property               @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  decision    ClassificationDecision
+  source      ClassificationSource
+  confidence  Float
+  evidence    Json
+  classifierVersion String
+  configHash  String
+  manualOverride Boolean @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([areaId, propertyId])
+  @@index([propertyId, decision])
+  @@index([areaId, decision, manualOverride])
+}
+
+model PropertyClassification {
+  id          String                 @id @default(cuid())
+  accountId   String
+  account     Account                @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  propertyId  String
+  property    Property               @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  tagSlug     String
+  decision    ClassificationDecision
+  source      ClassificationSource
+  confidence  Float
+  evidence    Json
+  classifierVersion String
+  configHash  String
+  manualOverride Boolean @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([accountId, propertyId, tagSlug])
+  @@index([propertyId, decision])
+  @@index([accountId, tagSlug, decision, manualOverride])
+}
+
+model ClassificationRun {
+  id          String                  @id @default(cuid())
+  accountId   String
+  account     Account                 @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  mode        ClassificationRunMode
+  status      ClassificationRunStatus @default(RUNNING)
+  configHash  String
+  classifierVersion String
+  cursor      String?
+  processed   Int @default(0)
+  changed     Int @default(0)
+  diff        Json?
+  error       String?
+  startedAt   DateTime @default(now())
+  completedAt DateTime?
+
+  @@index([accountId, startedAt])
+  @@index([status, startedAt])
+}
+
+/// Market event — one per listing period. MLS listings are global; MANUAL listings are account-owned.
+model Listing {
+  id         String   @id @default(cuid())
+  propertyId String
+  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  source    ListingSource
+  accountId String? // set only for MANUAL listings
+  account   Account?      @relation(fields: [accountId], references: [id], onDelete: SetNull)
+
+  mlsBoardId String?
+  mlsId      String? // public-facing RESO ListingId (de-prefixed) — display/search only, NOT the upsert key
+  listingKey String? @unique // immutable RESO ListingKey (stored prefixed) — the MLS-record upsert anchor (decision D17)
+  slug       String? @unique
+
+  listPrice Decimal?
+  status    ListingStatus @default(ACTIVE)
+  listDate  DateTime?
+  closeDate DateTime?
+
+  // IDX/VOW compliance (Lane F / D19): false when the MLS forbids public internet
+  // display (e.g. RESO InternetEntireListingDisplayYN=false). Non-displayable
+  // listings are kept for the agent's own records but excluded from the public
+  // search index and portal feeds.
+  idxDisplayable Boolean @default(true)
+
+  imageUrl    String?
+  description String?
+  rawData     String? // vendor-specific raw fields
+
+  listingAgentName  String?
+  listingAgentEmail String?
+  listingAgentPhone String?
+  brokerageName     String?
+  brokeragePhone    String?
+
+  // Denormalized from Property for search performance
+  bedrooms   Int?
+  bathrooms  Float?
+  squareFeet Int?
+
+  inquiries         Inquiry[]
+  favorites         UserFavorites[]
+  featuredInPortals PortalFeaturedListing[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relaxed from @@unique to @@index (decision D17): mlsId (RESO ListingId) is a
+  // de-prefixed display value and is not guaranteed unique; listingKey is the unique anchor.
+  @@index([mlsBoardId, mlsId])
+  @@index([status])
+  @@index([listPrice])
+  @@index([propertyId])
+  @@index([accountId])
+  @@index([slug])
+  @@index([listDate])
+  @@index([status, listPrice, bedrooms])
+}
+
+model Media {
+  id         String   @id @default(cuid())
+  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  propertyId String
+  url        String
+  caption    String?
+  order      Int?
+
+  createdAt DateTime @default(now())
+
+  @@index([propertyId])
+}
+
+model PortalFeaturedListing {
+  id        String  @id @default(cuid())
+  portalId  String
+  portal    Portal  @relation(fields: [portalId], references: [id], onDelete: Cascade)
+  listingId String
+  listing   Listing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  position  Int
+
+  @@unique([portalId, listingId])
+  @@index([portalId])
+}
+
+// ─────────────── User & Auth ───────────────
+
+model User {
+  id                      String    @id @default(cuid())
+  email                   String
+  accountId               String
+  account                 Account   @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  portalId                String?
+  portal                  Portal?   @relation(fields: [portalId], references: [id], onDelete: SetNull)
+  password                String?
+  firstName               String?
+  lastName                String?
+  phoneNumber             String?
+  avatarUrl               String?
+  // Kept for auth middleware backward compat; account-scoped access is via AccountMember.role
+  role                    String    @default("USER")
+  emailVerified           Boolean   @default(false)
+  emailVerificationToken  String?
+  passwordResetToken      String?
+  passwordResetExpires    DateTime?
+  marketingEmailsOptOutAt DateTime?
+
+  // Portal relations
+  favorites     UserFavorites[]
+  inquiries     Inquiry[]
+  savedSearches SavedSearch[]
+
+  // Identity links to CRM and account membership
+  contacts    Contact[]       @relation("UserContact")
+  memberships AccountMember[]
+
+  // Agent HQ relations — accessible via AccountMember.userId = User.id
+  assignedTasks        Task[]             @relation("TaskAssignee")
+  assignedTransactions Transaction[]      @relation("TransactionAgent")
+  assignedEvents       Event[]            @relation("EventAgent")
+  authoredNotes        Note[]             @relation("NoteAuthor")
+  marketReports        MarketReport[]     @relation("ReportAgent")
+  aiConversations      AIConversation[]   @relation("ConversationUser")
+  connectedAccounts    ConnectedAccount[]
+  authIdentities       AuthIdentity[]
+  emailDeliveries      EmailDelivery[]
+
+  // AI Copilot relations
+  aiActions AIAction[]   @relation("UserAIActions")
+  auditLogs AIAuditLog[] @relation("UserAIAuditLogs")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  // Partial unique indexes added via raw SQL in the init migration:
+  //   UNIQUE (email) WHERE portalId IS NULL              — agent emails globally unique
+  //   UNIQUE (portalId, email) WHERE portalId IS NOT NULL — consumer emails per portal
+
+  @@index([accountId])
+  @@index([portalId])
+}
+
+model EmailDelivery {
+  id         String  @id @default(cuid())
+  kind       String
+  to         String
+  subject    String
+  providerId String?
+
+  account   Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  accountId String
+  user      User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+  userId    String?
+
+  sentAt    DateTime @default(now())
+  createdAt DateTime @default(now())
+
+  /// (accountId, kind) sends once per account for a given kind, forever. Kinds
+  /// meant to recur (per portal, per Stripe event, etc.) must suffix `kind`
+  /// with a distinguishing id — see deliveryKind usage in lifecycleEmailService.ts.
+  @@unique([accountId, kind])
+  @@index([userId])
+  @@index([kind])
+  @@index([sentAt])
+}
+
+/// Sign-in identities (e.g. Google OAuth), separate from ConnectedAccount (Gmail/Calendar sync).
+model AuthIdentity {
+  id                String  @id @default(cuid())
+  provider          String
+  providerAccountId String
+  email             String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId            String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model UserFavorites {
+  id        String  @id @default(cuid())
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  listing   Listing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  listingId String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, listingId])
+}
+
+model SavedSearch {
+  id          String    @id @default(cuid())
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId      String
+  name        String
+  criteria    Json
+  lastRunAt   DateTime?
+  resultCount Int?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+}
+
+// ─────────────── Agent HQ CRM ───────────────
+
+model ContactSubmission {
+  id          String  @id @default(cuid())
+  firstName   String
+  lastName    String
+  email       String
+  phone       String?
+  inquiryType String
+  message     String
+
+  contact   Contact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  contactId String?
+
+  createdAt DateTime @default(now())
+}
+
+model Contact {
+  id        String  @id @default(cuid())
+  accountId String
+  account   Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  type            String  @default("LEAD")
+  firstName       String
+  lastName        String
+  email           String?
+  normalizedEmail String?
+  phone           String?
+  company         String?
+  source          String?
+  stage           String  @default("NEW")
+  tags            Json?
+  avatarUrl       String?
+
+  assignedMember   AccountMember? @relation(fields: [assignedMemberId], references: [id], onDelete: SetNull)
+  assignedMemberId String?
+
+  user   User?   @relation("UserContact", fields: [userId], references: [id], onDelete: SetNull)
+  userId String?
+
+  tracks             ContactTrack[]
+  interactions       ContactInteraction[]
+  transactionParties TransactionParty[]
+  submissions        ContactSubmission[]
+  tasks              Task[]
+  notes              Note[]
+  eventAttendees     EventAttendee[]
+  discoveredContacts TransactionDiscoveredContact[]
+  aiActions          AIAction[]
+  inquiries          Inquiry[]
+
+  // Denormalized activity fields for relationship memory scans
+  lastInteractionAt DateTime?
+  lastConsultAt     DateTime?
+  lastEventAt       DateTime?
+  nextTaskDueAt     DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([accountId, userId])
+  @@unique([accountId, normalizedEmail])
+  @@index([accountId])
+  @@index([type])
+  @@index([stage])
+  @@index([assignedMemberId])
+  @@index([email])
+  @@index([accountId, stage, updatedAt])
+  @@index([accountId, type, stage])
+  @@index([accountId, lastInteractionAt])
+  @@index([accountId, nextTaskDueAt])
+}
+
+model ContactTrack {
+  id        String   @id @default(cuid())
+  contact   Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  contactId String
+  side      String
+  stage     String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([contactId])
+  @@index([side])
+  @@index([isActive])
+  @@index([contactId, side, isActive])
+}
+
+model ContactInteraction {
+  id         String   @id @default(cuid())
+  contact    Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  contactId  String
+  type       String
+  side       String?
+  subject    String?
+  body       String?
+  occurredAt DateTime @default(now())
+  duration   Int?
+
+  createdAt DateTime @default(now())
+
+  @@index([contactId])
+  @@index([contactId, type])
+  @@index([contactId, side, occurredAt])
+  @@index([occurredAt])
+}
+
+model Transaction {
+  id             String    @id @default(cuid())
+  accountId      String
+  account        Account   @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  type           String
+  stage          String    @default("PROSPECT")
+  address        String?
+  mlsId          String?
+  listPrice      Decimal?
+  salePrice      Decimal?
+  commissionRate Float?
+  closingDate    DateTime?
+  notes          String?
+
+  offerPrice         Decimal?
+  sellerCreditAmount Decimal?
+  sellerCreditNote   String?
+  financingType      String?
+  downPayment        Decimal?
+  bankName           String?
+  saleType           String?
+
+  mutualDate                  DateTime?
+  possessionDate              DateTime?
+  loanApplicationDueDate      DateTime?
+  submittedToListingAgentDate DateTime?
+
+  earnestAmount       Decimal?
+  earnestMoneyDueDate DateTime?
+
+  inspectionDate            DateTime?
+  inspectionContingencyDate DateTime?
+  financingContingencyDate  DateTime?
+  appraisalContingencyDate  DateTime?
+  titleContingencyDate      DateTime?
+
+  propertyType      String?
+  occupancy         String?
+  county            String?
+  yearBuilt         Int?
+  isNewConstruction Boolean?
+  apnTaxId          String?
+  otherOffersCount  Int?
+
+  hasHoa             Boolean?
+  hasHomeWarranty    Boolean?
+  homeWarrantyPaidBy String?
+  buyerType          String?
+  accessInfo         String?
+
+  assignedAgent   User?   @relation("TransactionAgent", fields: [assignedAgentId], references: [id])
+  assignedAgentId String?
+
+  property   Property? @relation(fields: [propertyId], references: [id])
+  propertyId String?
+
+  template   TransactionTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  templateId String?
+
+  parties            TransactionParty[]
+  tasks              Task[]
+  transactionNotes   Note[]
+  events             Event[]
+  milestones         TransactionMilestone[]
+  documents          TransactionDocument[]
+  syncRuns           TransactionSyncRun[]
+  discoveredMessages TransactionDiscoveredMessage[]
+  aiActions          AIAction[]
+
+  driveFolderId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([accountId])
+  @@index([stage])
+  @@index([type])
+  @@index([closingDate])
+  @@index([propertyId])
+  @@index([assignedAgentId])
+  @@index([templateId])
+  @@index([accountId, stage, closingDate])
+  @@index([accountId, stage, updatedAt])
+}
+
+model TransactionTemplate {
+  id          String  @id @default(cuid())
+  key         String  @unique
+  name        String
+  description String?
+  isActive    Boolean @default(true)
+
+  milestones          MilestoneDefinition[]
+  taskDefinitions     TemplateTaskDefinition[]
+  eventDefinitions    TemplateEventDefinition[]
+  documentDefinitions TemplateDocumentDefinition[]
+  transactions        Transaction[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model TemplateDocumentDefinition {
+  id          String              @id @default(cuid())
+  template    TransactionTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  templateId  String
+  key         String
+  label       String
+  description String?
+  sortOrder   Int
+  required    Boolean             @default(true)
+
+  documents TransactionDocument[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([templateId, key])
+  @@index([templateId, sortOrder])
+}
+
+model TransactionDocument {
+  id                   String                      @id @default(cuid())
+  transaction          Transaction                 @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  transactionId        String
+  documentDefinition   TemplateDocumentDefinition? @relation(fields: [documentDefinitionId], references: [id], onDelete: SetNull)
+  documentDefinitionId String?
+  label                String
+  status               String                      @default("MISSING")
+  notes                String?
+
+  matchedAttachment   TransactionDiscoveredAttachment? @relation(fields: [matchedAttachmentId], references: [id], onDelete: SetNull)
+  matchedAttachmentId String?                          @unique
+  matchedAt           DateTime?
+  driveFileId         String?
+  driveWebLink        String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([transactionId])
+  @@index([status])
+}
+
+model MilestoneDefinition {
+  id          String              @id @default(cuid())
+  template    TransactionTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  templateId  String
+  key         String
+  label       String
+  description String?
+  sortOrder   Int
+  required    Boolean             @default(true)
+
+  taskDefinitions  TemplateTaskDefinition[]  @relation("TaskAnchorMilestone")
+  eventDefinitions TemplateEventDefinition[] @relation("EventAnchorMilestone")
+  milestones       TransactionMilestone[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([templateId, key])
+  @@index([templateId, sortOrder])
+}
+
+model TemplateTaskDefinition {
+  id          String              @id @default(cuid())
+  template    TransactionTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  templateId  String
+  key         String
+  title       String
+  description String?
+  priority    String              @default("MEDIUM")
+  status      String              @default("TODO")
+  offsetDays  Int                 @default(0)
+  sortOrder   Int
+
+  anchorMilestone   MilestoneDefinition @relation("TaskAnchorMilestone", fields: [anchorMilestoneId], references: [id], onDelete: Cascade)
+  anchorMilestoneId String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([templateId, key])
+  @@index([templateId, sortOrder])
+  @@index([anchorMilestoneId])
+}
+
+model TemplateEventDefinition {
+  id            String              @id @default(cuid())
+  template      TransactionTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  templateId    String
+  key           String
+  type          EventType
+  title         String
+  status        EventStatus         @default(SCHEDULED)
+  durationHours Int                 @default(1)
+  isAllDay      Boolean             @default(false)
+  offsetDays    Int                 @default(0)
+  sortOrder     Int
+
+  anchorMilestone   MilestoneDefinition @relation("EventAnchorMilestone", fields: [anchorMilestoneId], references: [id], onDelete: Cascade)
+  anchorMilestoneId String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([templateId, key])
+  @@index([templateId, sortOrder])
+  @@index([anchorMilestoneId])
+}
+
+model TransactionMilestone {
+  id                    String              @id @default(cuid())
+  transaction           Transaction         @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  transactionId         String
+  milestoneDefinition   MilestoneDefinition @relation(fields: [milestoneDefinitionId], references: [id], onDelete: Cascade)
+  milestoneDefinitionId String
+  date                  DateTime
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([transactionId, milestoneDefinitionId])
+  @@index([transactionId, date])
+  @@index([milestoneDefinitionId])
+}
+
+model TransactionParty {
+  id            String      @id @default(cuid())
+  transaction   Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  transactionId String
+  contact       Contact     @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  contactId     String
+  role          String
+
+  createdAt DateTime @default(now())
+
+  @@unique([transactionId, contactId, role])
+  @@index([transactionId])
+  @@index([contactId])
+}
+
+// ─────────────── Gmail Sync ───────────────
+
+model TransactionSyncRun {
+  id            String      @id @default(cuid())
+  transaction   Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  transactionId String
+  status        String      @default("RUNNING")
+  query         String?     @db.Text
+  messagesFound Int         @default(0)
+  error         String?     @db.Text
+  startedAt     DateTime    @default(now())
+  completedAt   DateTime?
+
+  discoveredMessages TransactionDiscoveredMessage[]
+
+  @@index([transactionId])
+  @@index([transactionId, startedAt])
+}
+
+model TransactionDiscoveredMessage {
+  id            String             @id @default(cuid())
+  transaction   Transaction        @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  transactionId String
+  syncRun       TransactionSyncRun @relation(fields: [syncRunId], references: [id], onDelete: Cascade)
+  syncRunId     String
+
+  providerMessageId String
+  providerThreadId  String?
+  subject           String?
+  snippet           String?   @db.Text
+  fromEmail         String?
+  fromName          String?
+  sentAt            DateTime?
+
+  category   String?
+  confidence Float?
+  status     String  @default("PENDING")
+
+  attachments TransactionDiscoveredAttachment[]
+  contacts    TransactionDiscoveredContact[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([transactionId, providerMessageId])
+  @@index([transactionId, status])
+  @@index([transactionId, category])
+  @@index([syncRunId])
+}
+
+model TransactionDiscoveredAttachment {
+  id                   String                       @id @default(cuid())
+  message              TransactionDiscoveredMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  messageId            String
+  providerAttachmentId String
+  filename             String
+  mimeType             String
+  sizeBytes            Int?
+
+  suggestedDocType    String?
+  suggestedConfidence Float?
+  extractedText       String? @db.Text
+
+  matchedDocument TransactionDocument?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([messageId, providerAttachmentId])
+  @@index([messageId])
+}
+
+model TransactionDiscoveredContact {
+  id        String                       @id @default(cuid())
+  message   TransactionDiscoveredMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  messageId String
+  email     String
+  name      String?
+  role      String?
+
+  contact   Contact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  contactId String?
+
+  createdAt DateTime @default(now())
+
+  @@index([messageId])
+  @@index([email])
+}
+
+model MarketReport {
+  id                     String  @id @default(cuid())
+  title                  String
+  subjectPropertyAddress String
+  subjectPropertyData    Json?
+  comparables            Json?
+  aiAnalysis             String? @db.Text
+  status                 String  @default("DRAFT")
+
+  agent   User   @relation("ReportAgent", fields: [agentId], references: [id])
+  agentId String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([agentId])
+  @@index([status])
+}
+
+model Campaign {
+  id             String    @id @default(cuid())
+  name           String
+  type           String
+  status         String    @default("DRAFT")
+  content        Json?
+  targetAudience Json?
+  scheduledAt    DateTime?
+  sentAt         DateTime?
+  stats          Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+  @@index([type])
+}
+
+model Task {
+  id          String    @id @default(cuid())
+  accountId   String
+  account     Account   @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  title       String
+  description String?
+  dueDate     DateTime?
+  priority    String    @default("MEDIUM")
+  status      String    @default("TODO")
+
+  assignedTo    User?        @relation("TaskAssignee", fields: [assignedToId], references: [id])
+  assignedToId  String?
+  contact       Contact?     @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  contactId     String?
+  transaction   Transaction? @relation(fields: [transactionId], references: [id], onDelete: SetNull)
+  transactionId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([accountId])
+  @@index([assignedToId])
+  @@index([status])
+  @@index([priority])
+  @@index([dueDate])
+  @@index([contactId])
+  @@index([transactionId])
+  @@index([accountId, status, dueDate])
+  @@index([transactionId, status, dueDate])
+  @@index([contactId, status, dueDate])
+}
+
+model Note {
+  id   String @id @default(cuid())
+  body String @db.Text
+
+  author        User         @relation("NoteAuthor", fields: [authorId], references: [id])
+  authorId      String
+  contact       Contact?     @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  contactId     String?
+  transaction   Transaction? @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  transactionId String?
+  property      Property?    @relation(fields: [propertyId], references: [id], onDelete: SetNull)
+  propertyId    String?
+  event         Event?       @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  eventId       String?      @unique
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([authorId])
+  @@index([contactId])
+  @@index([transactionId])
+  @@index([propertyId])
+  @@index([eventId])
+}
+
+model Event {
+  id          String    @id @default(cuid())
+  type        EventType
+  customType  String?
+  title       String
+  description String?   @db.Text
+  location    String?
+
+  startAt  DateTime
+  endAt    DateTime
+  isAllDay Boolean     @default(false)
+  timezone String?
+  status   EventStatus @default(SCHEDULED)
+
+  assignedAgent   User?        @relation("EventAgent", fields: [assignedAgentId], references: [id])
+  assignedAgentId String?
+  transaction     Transaction? @relation(fields: [transactionId], references: [id], onDelete: SetNull)
+  transactionId   String?
+  property        Property?    @relation(fields: [propertyId], references: [id], onDelete: SetNull)
+  propertyId      String?
+
+  attendees EventAttendee[]
+  notes     Note[]
+
+  providerCalendarId String?
+  providerEventId    String?
+  providerSyncError  String?
+  lastSyncedAt       DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([assignedAgentId])
+  @@index([transactionId])
+  @@index([propertyId])
+  @@index([type])
+  @@index([status])
+  @@index([startAt])
+  @@index([assignedAgentId, startAt])
+  @@index([providerEventId])
+}
+
+model EventAttendee {
+  id         String  @id @default(cuid())
+  event      Event   @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  eventId    String
+  contact    Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  contactId  String
+  role       String?
+  rsvpStatus String?
+
+  createdAt DateTime @default(now())
+
+  @@unique([eventId, contactId])
+  @@index([eventId])
+  @@index([contactId])
+}
+
+// ─────────────── Connected Accounts & Calendar ───────────────
+
+model ConnectedAccount {
+  id                    String    @id @default(cuid())
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId                String
+  provider              String    @default("google")
+  providerAccountId     String
+  email                 String
+  displayName           String?
+  scopes                Json?
+  encryptedAccessToken  String?   @db.Text
+  encryptedRefreshToken String?   @db.Text
+  accessTokenExpiresAt  DateTime?
+  gmailHistoryId        String?
+  calendarSyncToken     String?
+  lastSyncedAt          DateTime?
+  syncEnabled           Boolean   @default(true)
+
+  externalCalendarEvents ExternalCalendarEvent[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, provider])
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+  @@index([provider, email])
+}
+
+model ExternalCalendarEvent {
+  id                 String           @id @default(cuid())
+  connectedAccount   ConnectedAccount @relation(fields: [connectedAccountId], references: [id], onDelete: Cascade)
+  connectedAccountId String
+  providerCalendarId String
+  providerEventId    String
+  title              String?
+  description        String?          @db.Text
+  status             String?
+  location           String?
+  organizerEmail     String?
+  attendeeEmails     Json?
+  conferenceData     Json?
+  startAt            DateTime?
+  endAt              DateTime?
+  isAllDay           Boolean          @default(false)
+  rawMetadata        Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([connectedAccountId, providerCalendarId, providerEventId])
+  @@index([connectedAccountId, startAt])
+}
+
+// ─────────────── AI Copilot ───────────────
+
+model AIConversation {
+  id              String  @id @default(cuid())
+  title           String?
+  user            User    @relation("ConversationUser", fields: [userId], references: [id], onDelete: Cascade)
+  userId          String
+  contextType     String?
+  contextEntityId String?
+
+  messages         AIMessage[]
+  actions          AIAction[]
+  contextSnapshots AIContextSnapshot[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([contextType, contextEntityId])
+}
+
+model AIMessage {
+  id             String         @id @default(cuid())
+  conversation   AIConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  conversationId String
+  role           String
+  content        String         @db.Text
+  metadata       Json?
+
+  messageType      String @default("chat")
+  suggestedActions Json?
+
+  modelId          String?
+  promptTokens     Int?
+  completionTokens Int?
+
+  createdAt DateTime @default(now())
+
+  @@index([conversationId])
+}
+
+model AIAction {
+  id String @id @default(cuid())
+
+  user           User            @relation("UserAIActions", fields: [userId], references: [id], onDelete: Cascade)
+  userId         String
+  conversation   AIConversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+  conversationId String?
+
+  toolName    String
+  toolType    String
+  label       String
+  reason      String?
+  payload     Json
+  previewData Json?
+
+  contextType     String?
+  contextEntityId String?
+
+  sourceType     String?
+  sourceId       String?
+  workflowKey    String?
+  idempotencyKey String?
+
+  contact       Contact?     @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  contactId     String?
+  property      Property?    @relation(fields: [propertyId], references: [id], onDelete: SetNull)
+  propertyId    String?
+  transaction   Transaction? @relation(fields: [transactionId], references: [id], onDelete: SetNull)
+  transactionId String?
+
+  status               AIActionStatus @default(PENDING)
+  requiresConfirmation Boolean        @default(true)
+
+  priority     Int       @default(0)
+  dueAt        DateTime?
+  snoozedUntil DateTime?
+
+  lockedBy    String?
+  lockedUntil DateTime?
+
+  attemptCount  Int       @default(0)
+  lastAttemptAt DateTime?
+  lastError     String?
+
+  suggestedAt DateTime  @default(now())
+  decidedAt   DateTime?
+  executedAt  DateTime?
+  expiresAt   DateTime?
+
+  execution AIActionExecution?
+
+  modelId       String?
+  promptVersion String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, status, suggestedAt])
+  @@index([userId, status, dueAt])
+  @@index([userId, toolType, status, suggestedAt])
+  @@index([contextType, contextEntityId, status])
+  @@index([contactId, status])
+  @@index([propertyId, status])
+  @@index([transactionId, status])
+  @@index([sourceType, sourceId])
+  @@index([userId, sourceType, sourceId, workflowKey, status])
+  @@index([idempotencyKey])
+  @@index([conversationId])
+}
+
+model AIActionExecution {
+  id String @id @default(cuid())
+
+  action   AIAction @relation(fields: [actionId], references: [id], onDelete: Cascade)
+  actionId String   @unique
+
+  success    Boolean
+  result     Json?
+  error      String?
+  resultType String?
+  resultId   String?
+  durationMs Int?
+  executedBy String
+
+  createdAt DateTime @default(now())
+
+  @@index([actionId])
+  @@index([resultType, resultId])
+}
+
+model AIAuditLog {
+  id String @id @default(cuid())
+
+  user   User   @relation("UserAIAuditLogs", fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+
+  eventType     String
+  eventCategory String
+
+  conversationId  String?
+  actionId        String?
+  messageId       String?
+  contextType     String?
+  contextEntityId String?
+
+  eventData  Json?
+  requestId  String?
+  occurredAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([eventType])
+  @@index([eventCategory])
+  @@index([conversationId])
+  @@index([actionId])
+  @@index([occurredAt])
+  @@index([contextType, contextEntityId])
+}
+
+model AIContextSnapshot {
+  id String @id @default(cuid())
+
+  conversation   AIConversation? @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  conversationId String?
+  messageId      String?
+
+  contextType    String
+  entityId       String?
+  contextData    Json
+  retrievedItems Json?
+  retrievalQuery String?
+  contextTokens  Int?
+
+  createdAt DateTime @default(now())
+
+  @@index([conversationId])
+  @@index([contextType, entityId])
+}
+
+// ─────────────── Inquiries ───────────────
+
+model Inquiry {
+  id        String   @id @default(cuid())
+  accountId String
+  account   Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  portalId  String
+  portal    Portal   @relation(fields: [portalId], references: [id], onDelete: Cascade)
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  listingId String?
+  listing   Listing? @relation(fields: [listingId], references: [id], onDelete: SetNull)
+  areaId    String?
+  area      GeographicArea? @relation(fields: [areaId], references: [id], onDelete: SetNull)
+  collectionId String?
+  collection ListingCollection? @relation(fields: [collectionId], references: [id], onDelete: SetNull)
+  contactId String
+  contact   Contact  @relation(fields: [contactId], references: [id], onDelete: Restrict)
+
+  source             InquirySource
+  status             InquiryStatus @default(NEW)
+  visitorName        String
+  visitorEmail       String
+  visitorPhone       String?
+  message            String
+  contactPreference  String?
+  agentResponse      String?
+  respondedAt        DateTime?
+  areaSnapshot       String?
+  collectionSnapshot String?
+
+  deliveries InquiryDelivery[]
+  createdAt  DateTime          @default(now())
+  updatedAt  DateTime          @updatedAt
+
+  @@index([portalId, status, createdAt])
+  @@index([portalId, createdAt])
+  @@index([userId])
+  @@index([listingId])
+  @@index([areaId])
+  @@index([collectionId])
+  @@index([contactId])
+  @@index([accountId, createdAt])
+}
+
+model InquiryDelivery {
+  id             String               @id @default(cuid())
+  inquiryId      String
+  inquiry        Inquiry              @relation(fields: [inquiryId], references: [id], onDelete: Cascade)
+  accountId      String
+  account        Account              @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  kind           String
+  recipient      String
+  payload        Json
+  idempotencyKey String               @unique
+  state          InquiryDeliveryState @default(PENDING)
+  attempts       Int                  @default(0)
+  maxAttempts    Int                  @default(5)
+  nextAttemptAt  DateTime             @default(now())
+  lockedAt       DateTime?
+  deliveredAt    DateTime?
+  deadLetteredAt DateTime?
+  lastError      String?
+  providerId     String?
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+
+  @@index([state, nextAttemptAt])
+  @@index([inquiryId])
+  @@index([accountId, createdAt])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MLS Grid sync (Canopy) — added by the MLS Grid integration (Lane A / task T3).
+// See docs/mlsgrid-implementation-plan.md → "Engineering Review Decisions".
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Per-resource incremental watermark. `lastSyncAt` holds the greatest
+/// ModificationTimestamp seen for the resource (decision D4) — the server's clock,
+/// not the client's — so incremental pulls never skip records on clock skew.
+model SyncCursor {
+  id         String   @id @default(cuid())
+  providerId String // e.g. "mlsgrid"
+  resource   String // "Property" | "Member" | "Office"
+  lastSyncAt DateTime // max(ModificationTimestamp) committed for this resource
+  updatedAt  DateTime @updatedAt
+
+  @@unique([providerId, resource])
+}
+
+/// MLS member roster, synced from MLS Grid's Member resource. Backs agent
+/// onboarding verification (decision D8): a submitted MLS ID is matched here, and
+/// on success an AccountMlsAccess row is written.
+model MlsAgent {
+  id           String    @id @default(cuid())
+  providerId   String // "mlsgrid"
+  externalId   String // MemberKey (prefixed, immutable)
+  mlsId        String? // MemberMlsId (de-prefixed) — the ID agents enter at onboarding
+  firstName    String?
+  lastName     String?
+  name         String?
+  email        String?
+  phone        String?
+  stateLicense String?
+  status       String? // "Active" | "Inactive" | ...
+  officeKey    String?
+  officeMlsId  String?
+  rawData      Json?
+  modifiedAt   DateTime?
+  syncedAt     DateTime  @default(now())
+
+  @@unique([providerId, externalId])
+  @@index([mlsId])
+  @@index([email])
+}
+
+/// MLS office roster, synced from MLS Grid's Office resource.
+model MlsOffice {
+  id         String    @id @default(cuid())
+  providerId String
+  externalId String // OfficeKey (prefixed)
+  mlsId      String? // OfficeMlsId (de-prefixed)
+  name       String?
+  phone      String?
+  address    String?
+  city       String?
+  zipCode    String?
+  status     String?
+  rawData    Json?
+  modifiedAt DateTime?
+  syncedAt   DateTime  @default(now())
+
+  @@unique([providerId, externalId])
+  @@index([mlsId])
+}
+
+/// Dead-letter capture for records that failed to process (decision D13). The
+/// sync retries these with backoff so one poison record can't wedge or silently
+/// drop the batch; the watermark still advances on the successful records.
+model MlsSyncFailure {
+  id          String   @id @default(cuid())
+  providerId  String
+  resource    String // "Property" | "Member" | "Office"
+  externalId  String // ListingKey / MemberKey / OfficeKey of the failed record
+  payload     Json // the raw record, so a retry needs no re-fetch
+  error       String // last error message
+  retryCount  Int      @default(0)
+  lastTriedAt DateTime @default(now())
+  createdAt   DateTime @default(now())
+
+  @@unique([providerId, resource, externalId])
+  @@index([resource, retryCount])
+}

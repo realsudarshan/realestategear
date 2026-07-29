@@ -1,0 +1,24 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "allowJs": false,
+    "lib": [
+      "esnext"
+    ],
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "types": [
+      "node"
+    ]
+  },
+  "include": [
+    "index.ts",
+    "scripts/seedGuard.ts",
+    "scripts/guardDemoSeed.ts",
+    "scripts/seedGuard.test.ts",
+    "generated/prisma/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules"
+  ]
+}

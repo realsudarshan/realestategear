@@ -1,0 +1,44 @@
+node_modules
+dist
+.next
+out
+packages/db/generated/
+
+.env*
+!.env.example
+
+.turbo
+.gstack
+.claude
+.agents
+skills
+skills-lock.json
+coverage
+.cursor
+.context
+
+# Winston daily-rotate audit files (mutate when tests run)
+apps/mls-service/logs/
+
+LOCAL.md
+
+.DS_Store
+.idea
+
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+*.tsbuildinfo
+
+# Local databases and database artifacts
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+*.dump
+
+# Internal/generated planning artifacts
+*.docx
+DESIGN_PREVIEW.html

@@ -1,0 +1,44 @@
+{
+  "name": "@realestategear/mls-service",
+  "version": "1.0.0",
+  "description": "MLS data synchronization service for Real Estate Gear",
+  "type": "module",
+  "main": "src/index.ts",
+  "scripts": {
+    "start": "node --import tsx src/index.ts",
+    "dev": "tsx watch src/index.ts",
+    "typecheck": "tsc --project tsconfig.json --pretty false",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "sample-pull": "node --import tsx scripts/sample-pull.ts"
+  },
+  "keywords": [
+    "mls",
+    "real-estate",
+    "data-sync",
+    "job-runner"
+  ],
+  "author": "Real Estate Gear Team",
+  "license": "Apache-2.0",
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.1045.0",
+    "axios": "^1.18.1",
+    "db": "*",
+    "dotenv": "^16.3.1",
+    "node-cron": "^4.6.0",
+    "search": "*",
+    "winston": "^3.11.0",
+    "winston-daily-rotate-file": "^4.7.1"
+  },
+  "devDependencies": {
+    "tsx": "^4.21.0",
+    "vitest": "^4.1.5"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "prisma": {
+    "schema": "../../packages/db/prisma/schema.prisma"
+  }
+}

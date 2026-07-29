@@ -1,0 +1,7 @@
+/* The shared preset supplies the structural Tailwind and token contract. */
+@import "@realestategear/tokens/preset.css";
+@import "./theme.generated.css";
+
+/* Tailwind ignores dependencies by default, so consumers explicitly register
+ * the shared component package as a class source. */
+@source "../../../packages/ui/src";

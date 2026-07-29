@@ -1,0 +1,24 @@
+{
+  "name": "cache",
+  "version": "0.1.0",
+  "private": true,
+  "license": "Apache-2.0",
+  "main": "src/index.ts",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --project tsconfig.json --pretty false",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "ioredis": "^5.3.2"
+  },
+  "devDependencies": {
+    "vitest": "^4.1.5"
+  },
+  "peerDependencies": {
+    "ioredis": "^5.3.2"
+  }
+}

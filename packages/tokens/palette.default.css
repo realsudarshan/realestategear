@@ -1,0 +1,78 @@
+/* @realestategear/tokens — premium real estate palette.
+ * Warm cream canvas, deep navy text, rich navy/slate primary,
+ * and gold accents. Conveys trust, sophistication and premium positioning. */
+
+:root {
+  --radius: 0.625rem;
+
+  /* Surfaces */
+  --background:  oklch(0.985 0.005 76);     /* warm ivory */
+  --foreground:  oklch(0.18  0.025 255);    /* deep navy */
+  --card:        oklch(1.000 0.000 0);      /* pure white */
+  --card-foreground: oklch(0.18 0.025 255);
+  --popover:     oklch(1.000 0.000 0);
+  --popover-foreground: oklch(0.18 0.025 255);
+
+  /* Hierarchy */
+  --primary:          oklch(0.24  0.06 255);   /* deep navy blue */
+  --primary-foreground: oklch(0.98 0.005 76);
+  --secondary:        oklch(0.93  0.008 76);   /* soft warm sand */
+  --secondary-foreground: oklch(0.22 0.025 255);
+  --muted:            oklch(0.94  0.006 76);
+  --muted-foreground: oklch(0.52  0.018 255);
+  --accent:           oklch(0.73  0.10  82);   /* warm gold accent */
+  --accent-foreground: oklch(0.15 0.03 255);
+
+  /* State */
+  --destructive: oklch(0.58 0.24 27);
+  --success:     oklch(0.58 0.16 152);
+  --success-foreground: oklch(0.99 0 0);
+  --warning:     oklch(0.73 0.14 72);
+  --warning-foreground: oklch(0.18 0.025 255);
+
+  /* Structure */
+  --border: oklch(0.87  0.008 255);
+  --input:  oklch(0.87  0.008 255);
+  --ring:   oklch(0.24  0.06  255);
+
+  /* Charts */
+  --chart-1: oklch(0.73 0.10  82);
+  --chart-2: oklch(0.54 0.12 218);
+  --chart-3: oklch(0.40 0.08 255);
+  --chart-4: oklch(0.66 0.14 140);
+  --chart-5: oklch(0.60 0.18  27);
+}
+
+.dark {
+  --background:  oklch(0.11 0.018 255);
+  --foreground:  oklch(0.95 0.008 76);
+  --card:        oklch(0.15 0.022 255);
+  --card-foreground: oklch(0.95 0.008 76);
+  --popover:     oklch(0.16 0.022 255);
+  --popover-foreground: oklch(0.95 0.008 76);
+
+  --primary:          oklch(0.78 0.06  82);   /* gold in dark mode */
+  --primary-foreground: oklch(0.11 0.02 255);
+  --secondary:        oklch(0.20 0.026 255);
+  --secondary-foreground: oklch(0.90 0.008 76);
+  --muted:            oklch(0.18 0.022 255);
+  --muted-foreground: oklch(0.62 0.022 255);
+  --accent:           oklch(0.68 0.10  82);
+  --accent-foreground: oklch(0.11 0.02 255);
+
+  --destructive: oklch(0.65 0.22 22);
+  --success:     oklch(0.66 0.16 152);
+  --success-foreground: oklch(0.11 0.01 255);
+  --warning:     oklch(0.76 0.14 72);
+  --warning-foreground: oklch(0.11 0.01 255);
+
+  --border: oklch(0.28 0.03  255);
+  --input:  oklch(0.25 0.028 255);
+  --ring:   oklch(0.78 0.06  82);
+
+  --chart-1: oklch(0.78 0.10  82);
+  --chart-2: oklch(0.60 0.14 218);
+  --chart-3: oklch(0.74 0.16 152);
+  --chart-4: oklch(0.63 0.20 303);
+  --chart-5: oklch(0.65 0.24  16);
+}

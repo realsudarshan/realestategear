@@ -1,0 +1,43 @@
+{
+  "name": "db",
+  "version": "0.1.0",
+  "private": true,
+  "license": "Apache-2.0",
+  "main": "index.ts",
+  "type": "module",
+  "exports": {
+    ".": "./index.ts",
+    "./classification": "./classification.ts"
+  },
+  "prisma": {
+    "schema": "./prisma/schema.prisma"
+  },
+  "dependencies": {
+    "@faker-js/faker": "^8.4.1",
+    "@realestategear/portal-config": "*",
+    "@prisma/adapter-pg": "^7.4.0",
+    "@prisma/client": "^7.4.0",
+    "bcrypt": "^6.0.0",
+    "dotenv": "^16.5.0"
+  },
+  "devDependencies": {
+    "prisma": "^7.4.0",
+    "tsx": "^4.21.0"
+  },
+  "scripts": {
+    "typecheck": "tsc --project tsconfig.json --pretty false",
+    "test:seed-guard": "node --import tsx --test scripts/seedGuard.test.ts",
+    "prisma": "prisma",
+    "seed:demo:reset": "node --import tsx prisma/seed.ts",
+    "seed:1000": "node --import tsx prisma/seed-1000.ts",
+    "seed:demo:reset:1000": "node --import tsx prisma/seed-1000.ts --force",
+    "seed:demo:reset:agent": "node --import tsx prisma/seed-agent.ts",
+    "seed:portal": "node --import tsx prisma/seed-portal.ts",
+    "seed:demo-listings": "node --import tsx prisma/seed-demo-listings.ts",
+    "generate": "prisma generate",
+    "build": "prisma generate",
+    "db:migrate": "prisma migrate deploy",
+    "db:reset:destructive": "node --import tsx scripts/guardDemoSeed.ts && prisma migrate reset --force",
+    "classify": "node --import tsx scripts/classify.ts"
+  }
+}

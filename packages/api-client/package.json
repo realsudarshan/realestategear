@@ -1,0 +1,32 @@
+{
+  "name": "@realestategear/api-client",
+  "version": "0.1.0",
+  "description": "Environment-safe API URL resolution for Real Estate Gear applications.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": ["dist", "README.md"],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "engines": { "node": ">=20" },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/realestategear/realestategear.git",
+    "directory": "packages/api-client"
+  },
+  "homepage": "https://github.com/realestategear/realestategear#readme",
+  "bugs": "https://github.com/realestategear/realestategear/issues",
+  "publishConfig": { "access": "public", "provenance": true },
+  "scripts": {
+    "build": "tsup && node ../../scripts/copy-package-legal.mjs",
+    "test": "node --import tsx --test index.test.ts",
+    "typecheck": "tsc --project tsconfig.json --pretty false",
+    "prepack": "npm run test && npm run typecheck && npm run build"
+  }
+}

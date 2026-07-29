@@ -1,0 +1,3 @@
+-- Intentionally portable no-op.
+--
+-- See scripts/enable-trigram-search.sql for the optional pg_trgm indexes.
