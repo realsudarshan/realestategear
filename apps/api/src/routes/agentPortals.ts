@@ -510,7 +510,7 @@ router.put('/:id/featured-listings', async (req, res, next) => {
   }
 });
 
-// ─── Custom domains (docs/plans/PORTAL_PLATFORM_PLAN.md Phase 1) ──────────
+// ─── Custom domains ───────────────────────────────────────────────────────
 // Verified custom domains for a portal. See portalDomainService.ts for the
 // DNS-TXT verification state machine and plan-entitlement gating.
 

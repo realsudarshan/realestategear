@@ -1,90 +1,60 @@
 # Database Package
 
-This package contains the Prisma database configuration and seeding scripts for the Real Estate Gear application.
+This workspace contains the PostgreSQL Prisma schema, migrations, generated client configuration, and guarded demo seeds.
 
-## Seeding Options
+Run commands from the repository root with Node.js `>=22.12.0 <23` and npm workspaces. No exact npm version is pinned; installs use the root `package-lock.json`.
 
-### Default Local Demo Seed
-```bash
-npm run seed
-```
-Run this from the repo root. It resets local dev data and creates the Agent HQ-ready Charlotte demo dataset: 1000 listings, media, verified Canopy MLS access, deployed listing segments, CRM contacts, transactions, tasks, action queue items, and demo user accounts.
-
-### Small Seed (20 Properties)
-```bash
-npm run seed
-```
-This runs the original seed with 20 hand-crafted Charlotte properties for development.
-
-### Large Seed (1000 Properties)
-```bash
-npm run seed:1000
-```
-This generates 1000 realistic Charlotte properties using Faker.js across 15 neighborhoods.
-
-## Seeding Features
-
-### Property Generation
-- **1000 Properties**: Distributed across 15 Charlotte metro neighborhoods
-- **Realistic Locations**: Coordinates within actual neighborhood boundaries
-- **Market-Based Pricing**: Property type and age-adjusted pricing
-- **Diverse Property Types**: Single Family, Condos, Townhouses
-- **Charlotte-Specific Data**: Real street names, zip codes, neighborhoods
-
-### Neighborhoods Covered
-- Uptown Charlotte, Dilworth, Myers Park, South End
-- NoDa, Plaza Midwood, Fourth Ward, Elizabeth
-- SouthPark, Ballantyne, Davidson, Matthews
-- Cornelius, Huntersville, Mint Hill
-
-### Media & Images
-- Lightweight placeholder images for fast seeding
-- Multiple photos per property (3-8 images)
-- Realistic captions and ordering
-
-### Sample Data
-- Test user accounts (USER, AGENT, ADMIN roles)
-- Sample favorites and inquiries
-- Property media collections
-
-## Database Commands
+## Schema And Migrations
 
 ```bash
-# Install dependencies (run this first)
-npm install
-
 # Generate Prisma client
-npm run generate
+npm run build --workspace=db
 
-# Reset database and reseed with original data
-npm run db:reset
-
-# Reset database and reseed with 1000 properties
-npm run db:reset && npm run seed:1000
-
-# Deploy migrations
+# Apply committed migrations
 npm run db:migrate
+
+# Check migration status
+npx prisma migrate status --config=packages/db/prisma.config.ts
+
+# Author a migration against a disposable development database
+npx prisma migrate dev --config=packages/db/prisma.config.ts --name <migration-name>
 ```
 
-## Test Accounts
+API startup does not apply migrations. Run `npm run db:migrate` explicitly during deployment before starting the API.
 
-After seeding, you can use these accounts:
+## Guarded Demo Seeds
 
-Demo accounts are local-only. Seed commands print the accounts they create; do
-not reuse demo credentials in a deployed environment.
+Every seed command below requires `DATABASE_URL`, refuses to run when `NODE_ENV=production`, and requires `CONFIRM_DEMO_SEED` to exactly match the parsed `<host>:<port>/<database>` target, including `?schema=...` when present.
 
-## Performance Notes
+For example:
 
-- The 1000-property seed takes 2-3 minutes to complete
-- Properties are generated in batches of 100 for optimal performance
-- Media generation is limited to first 100 properties to keep seed time reasonable
-- All coordinates are within realistic Charlotte neighborhood boundaries
+```bash
+export DATABASE_URL='postgresql://realestategear:change-me@localhost:5432/realestategear_dev?schema=public'
+export CONFIRM_DEMO_SEED='localhost:5432/realestategear_dev?schema=public'
+```
 
-## Data Structure
+Populate portal demo records:
 
-The seeding script generates:
-- Properties with realistic Charlotte addresses and coordinates
-- Market-appropriate pricing based on neighborhood and property type
-- Property details (bedrooms, bathrooms, square footage) appropriate for type
-- Listing statuses: 70% Active, 20% Pending, 10% Sold
-- MLS-style raw data with agent names and property features
+```bash
+npm run db:seed:portal
+npm run db:seed:demo-listings
+```
+
+Populate the 1,000-property demo dataset only when the database has no existing properties or users:
+
+```bash
+npm run db:seed:1000
+```
+
+Destructive reset commands:
+
+```bash
+npm run db:demo:reset
+npm run db:demo:reset:1000
+npm run db:demo:reset:agent
+npm run db:demo:reset-and-seed
+```
+
+**Warning:** reset commands delete or replace data. Verify `DATABASE_URL` independently and confirm the target printed by the guard before proceeding. Never set `CONFIRM_DEMO_SEED` in production or add a seed command to application startup.
+
+Demo accounts and credentials are local-only. Seed commands report what they create; do not reuse those credentials in any deployed environment.

@@ -2,10 +2,8 @@ import { randomBytes } from 'node:crypto';
 import { resolveTxt } from 'node:dns/promises';
 import { prisma } from 'db';
 
-// docs/plans/PORTAL_PLATFORM_PLAN.md Phase 1: "Add PortalDomain persistence
-// and verified-domain state machine." Portal.customDomain (the older raw
-// @unique field on Portal) is untouched by this file — nothing here reads or
-// writes it. See the plan's "Open Decisions" for the long-term reconciliation.
+// PortalDomain owns the verified-domain state machine. Portal.customDomain is
+// an older raw field and is intentionally not read or written here.
 
 const HOSTNAME_RE = /^(?!-)[a-z0-9-]{1,63}(?<!-)(\.(?!-)[a-z0-9-]{1,63}(?<!-))+$/;
 const CHALLENGE_PREFIX = '_realestategear-challenge.';

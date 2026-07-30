@@ -1,10 +1,9 @@
 /**
  * MLS ETL Service — entry point.
  *
- * The legacy multi-provider sync framework was removed (decision D1; see
- * docs/mlsgrid-implementation-plan.md). This path wires a generic RESO Web
- * API connector (MLS Grid, Trestle, Bridge Interactive, Spark API, and any
- * other RESO Web API vendor) into the streaming sync orchestrator — see
+ * This path wires a generic RESO Web API connector (MLS Grid, Trestle, Bridge
+ * Interactive, Spark API, and other compatible vendors) into the streaming
+ * sync orchestrator. See
  * docs/MLS_BOARD_SETUP.md for how to configure your own board/vendor.
  *
  * mls-service is a data-tier backend worker: it reads/writes Postgres directly via

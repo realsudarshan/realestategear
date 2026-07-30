@@ -64,7 +64,8 @@
     "test:packages": "npm run test --workspace=@realestategear/api-client && npm run test --workspace=@realestategear/tokens && npm run test --workspace=@realestategear/ui",
     "verify:packages": "node scripts/verify-package-tarballs.mjs",
     "test:package-consumer": "node scripts/test-package-consumer.mjs",
-    "release:check": "npm run test:packages && npm run build --workspace=db && npm run typecheck && npm run build:packages && npm run verify:packages && npm run test:package-consumer"
+    "release:check": "npm run test:packages && npm run build --workspace=db && npm run typecheck && npm run build:packages && npm run verify:packages && npm run test:package-consumer",
+    "docs:check": "node scripts/check-docs.mjs"
   },
   "overrides": {
     "esbuild": "^0.28.1",

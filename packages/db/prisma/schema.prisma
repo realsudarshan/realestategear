@@ -242,10 +242,10 @@ enum PortalDomainStatus {
   REMOVED
 }
 
-// Verified custom domains for a portal. Distinct from Portal.customDomain
-// (a raw, unverified @unique field kept for now — see docs/plans/PORTAL_PLATFORM_PLAN.md
-// "Open Decisions"). A hostname only routes real traffic once it reaches
-// ACTIVE here; nothing reads Portal.customDomain to authorize routing.
+// Verified custom domains for a portal. Distinct from Portal.customDomain, a
+// raw, unverified @unique field retained for compatibility. A hostname only
+// routes real traffic once it reaches ACTIVE here; Portal.customDomain is not
+// used to authorize routing.
 model PortalDomain {
   id       String             @id @default(cuid())
   portalId String
@@ -1556,8 +1556,7 @@ model InquiryDelivery {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// MLS Grid sync (Canopy) — added by the MLS Grid integration (Lane A / task T3).
-// See docs/mlsgrid-implementation-plan.md → "Engineering Review Decisions".
+// RESO Web API synchronization state.
 // ─────────────────────────────────────────────────────────────────────────────
 
 /// Per-resource incremental watermark. `lastSyncAt` holds the greatest

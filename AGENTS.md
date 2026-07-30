@@ -2,13 +2,15 @@
 
 ## Current Operational Boundary
 
-- Use Node `22.12.0` and npm workspaces. Do not use pnpm or yarn.
+- Use Node `>=22.12.0 <23` and npm workspaces. Package publishing requires
+  Node `22.14.0` or newer. Do not use pnpm or yarn.
 - Treat `apps/portal` as the default public frontend. Root `npm run dev` and `npm start` run the portal with `apps/api`.
 - The current core runtime is portal + API + PostgreSQL. PostgreSQL is required; Redis and Typesense are optional.
 - `apps/mls-service` is the included MLS worker and runs as a separate process. Without MLS credentials it can remain dormant.
 - `/api/agent/*` is fail-closed unless `AGENT_API_ENABLED=true`; examples and deployments must keep `AGENT_API_ENABLED=false` by default.
 - Agent HQ, internal admin, marketing, and client-specific portals live in separate private repositories. Do not add private product source back to this public core.
-- Keep current-state documentation separate from [the Clean Core roadmap](./docs/REALESTATEGEAR_OSS_ROADMAP.md).
+- Keep public documentation focused on durable current behavior. Track actionable
+  work in GitHub Issues, not repository TODO files or implementation plans.
 
 ## Commands
 
@@ -35,7 +37,8 @@
 - `apps/portal` rewrites same-origin `/api/:path*` requests to `NEXT_PUBLIC_API_URL` or the local API fallback. Authenticated portal requests use its server-side proxy and httpOnly session cookie.
 - `FRONTEND_URL` is the canonical portal origin used by the API for links and callbacks. Local examples must use port 3006.
 - API-specific variables belong in `apps/api/.env` or the API service environment.
-- Leave `TYPESENSE_HOST` unset for PostgreSQL search. Leave `REDIS_URL` unset to run without Redis.
+- Leave `TYPESENSE_HOST` unset for PostgreSQL search. Set `REDIS_ENABLED=false`
+  to run without Redis.
 - Deployment domains should point directly at the root of `apps/portal`.
 
 ## Design System
@@ -43,3 +46,12 @@
 - Read root `DESIGN.md` before UI work.
 - Prefer shared components in `packages/ui` and tokens in `packages/tokens` over app-local duplication.
 - Keep the established compact soft-brutalist language: Geist, visible borders, small radii, restrained motion, and semantic tokens.
+
+## Documentation
+
+- Treat `README.md`, `docs/README.md`, and the linked operational guides as
+  current-state documentation; update them in the same change as behavior.
+- Put durable architecture and design decisions in public docs or ADRs.
+- Do not add planning transcripts, customer context, security investigations, or
+  commercial strategy to this repository.
+- Link public follow-up work to a GitHub Issue with acceptance criteria.
