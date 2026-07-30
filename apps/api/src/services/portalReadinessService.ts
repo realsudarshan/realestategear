@@ -376,7 +376,10 @@ export async function getPortalListings(portal: PortalForReadiness, query: Porta
 
   const totalPages = Math.ceil(total / limit);
   return {
-    properties: properties.map(toPortalProperty),
+    // Wrap the callback: Array#map passes (element, index), and a bare reference
+    // would feed the index into `selectedListing`, which `??` treats as a real
+    // value (0 is not nullish) — nulling out every listing-derived field.
+    properties: properties.map((property) => toPortalProperty(property)),
     pagination: { page, limit, total, totalPages, hasNext: page < totalPages, hasPrev: page > 1 },
     readiness,
   };

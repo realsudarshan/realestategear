@@ -11,17 +11,16 @@ export function isMlsPublicDisplayEnabled(
 }
 
 export function buildPublicListingWhere(
-  additionalWhere?: Prisma.ListingWhereInput,
+  additional?: Prisma.ListingWhereInput,
   env: PropertyVisibilityEnvironment = process.env,
 ): Prisma.ListingWhereInput {
-  const allowMlsDisplay = isMlsPublicDisplayEnabled(env);
   const baseline: Prisma.ListingWhereInput = {
     status: ListingStatus.ACTIVE,
     idxDisplayable: true,
-    ...(allowMlsDisplay ? {} : { source: { not: ListingSource.MLS } }),
+    ...(isMlsPublicDisplayEnabled(env) ? {} : { source: { not: ListingSource.MLS } }),
   };
 
-  return additionalWhere ? { AND: [baseline, additionalWhere] } : baseline;
+  return additional ? { AND: [baseline, additional] } : baseline;
 }
 
 export function getPublicPropertyTypesenseBaselineFilter(

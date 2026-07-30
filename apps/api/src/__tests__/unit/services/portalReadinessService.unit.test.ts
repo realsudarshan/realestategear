@@ -42,4 +42,17 @@ describe('collection-backed portal readiness', () => {
     expect(JSON.stringify(query.include.listings.where)).toContain('"source":{"not":"MLS"}');
     expect(result?.media).toEqual([]);
   });
+  it('keeps listing-derived fields on every row (Array#map index must not be taken as the selected listing)', async () => {
+    property.findMany.mockResolvedValue([
+      { id: 'p-a', address: '1 Main', city: 'Charlotte', state: 'NC', media: [], listings: [{ id: 'l-a', source: 'MANUAL', status: 'ACTIVE', listPrice: 840000, slug: 'one-main', imageUrl: 'https://example.com/a.jpg' }] },
+      { id: 'p-b', address: '2 Main', city: 'Charlotte', state: 'NC', media: [], listings: [{ id: 'l-b', source: 'MANUAL', status: 'ACTIVE', listPrice: 925000, slug: 'two-main', imageUrl: 'https://example.com/b.jpg' }] },
+    ]);
+
+    const result = await service.getPortalListings(portal);
+
+    expect(result.properties.map((row) => [row.price, row.slug, row.listingId, row.status, row.imageUrl])).toEqual([
+      [840000, 'one-main', 'l-a', 'ACTIVE', 'https://example.com/a.jpg'],
+      [925000, 'two-main', 'l-b', 'ACTIVE', 'https://example.com/b.jpg'],
+    ]);
+  });
 });
