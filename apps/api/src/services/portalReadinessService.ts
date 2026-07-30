@@ -1,7 +1,8 @@
-import { ListingStatus, Prisma, PropertyType, prisma } from 'db';
+import { Prisma, PropertyType, prisma } from 'db';
 import { getPortalConfig, type PublicPortalConfig, toPublicPortalConfig } from '@realestategear/portal-config';
 import { resolveMlsBoardName } from '../utils/mlsBoardName.js';
 import { compileCollectionPredicate } from 'search/collectionPredicate';
+import { buildPublicListingWhere, isMlsPublicDisplayEnabled } from 'search/propertyVisibility';
 
 export type PortalGateState = 'passed' | 'blocked' | 'warning';
 
@@ -117,9 +118,7 @@ function buildActiveListingWhere(
   boardIds: string[],
   priceFilters: { minPrice?: number; maxPrice?: number } = {}
 ): Prisma.ListingWhereInput {
-  return {
-    status: ListingStatus.ACTIVE,
-    idxDisplayable: true,
+  return buildPublicListingWhere({
     ...(boardIds.length > 0 ? { mlsBoardId: { in: boardIds } } : {}),
     ...(priceFilters.minPrice != null || priceFilters.maxPrice != null
       ? {
@@ -129,7 +128,7 @@ function buildActiveListingWhere(
           },
         }
       : {}),
-  };
+  });
 }
 
 export function buildPortalPropertyWhere(
@@ -142,7 +141,8 @@ export function buildPortalPropertyWhere(
 
   const where: Prisma.PropertyWhereInput = {
     AND: [
-      { OR: collections.map((collection) => compileCollectionPredicate(collection.predicate, { accountId: portal.accountId, portalId: portal.id, boardIds, collectionId: collection.id })) },
+      { OR: collections.map((collection) => compileCollectionPredicate(collection.predicate, { accountId: portal.accountId, portalId: portal.id, boardIds, collectionId: collection.id, publicVisibility: true })) },
+      { listings: { some: buildActiveListingWhere(boardIds, { minPrice: filters.minPrice, maxPrice: filters.maxPrice }) } },
     ],
     // Math.trunc: bedrooms is a typed Int column — a fractional query param
     // (e.g. ?bedrooms=2.5) would otherwise reach Prisma as a float and throw
@@ -153,10 +153,6 @@ export function buildPortalPropertyWhere(
       ? { propertyType: filters.propertyType }
       : {}),
   };
-  if (filters.minPrice != null || filters.maxPrice != null) {
-    (where.AND as Prisma.PropertyWhereInput[]).push({ listings: { some: buildActiveListingWhere(boardIds, { minPrice: filters.minPrice, maxPrice: filters.maxPrice }) } });
-  }
-
   const search = filters.q?.trim();
   if (search) {
     where.AND = [
@@ -290,7 +286,7 @@ function toPortalProperty(property: any, selectedListing?: any) {
     bedrooms: property.bedrooms ?? listing?.bedrooms ?? null,
     bathrooms: property.bathrooms ?? listing?.bathrooms ?? null,
     squareFeet: property.squareFeet ?? listing?.squareFeet ?? null,
-    imageUrl: listing?.imageUrl ?? property.media?.[0]?.url ?? null,
+    imageUrl: listing?.imageUrl ?? (isMlsPublicDisplayEnabled() ? property.media?.[0]?.url ?? null : null),
     slug: listing?.slug ?? null,
     status: listing?.status ?? null,
     listingId: listing?.id ?? null,
@@ -314,7 +310,7 @@ function toPortalPropertyDetail(property: any, listing: any) {
     listingAgentName: listing.listingAgentName ?? null,
     brokerageName: listing.brokerageName ?? null,
     brokeragePhone: listing.brokeragePhone ?? null,
-    media: (property.media ?? []).map((item: any) => ({
+    media: (isMlsPublicDisplayEnabled() ? property.media ?? [] : []).map((item: any) => ({
       id: item.id,
       url: item.url,
       caption: item.caption ?? null,

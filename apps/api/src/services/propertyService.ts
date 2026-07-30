@@ -1,12 +1,31 @@
 import { ListingStatus, Prisma, PropertyType, prisma } from 'db';
-import { upsertDocument, deleteDocument, toPropertyDoc } from '../search/index.js';
+import { deleteDocument, isTypesenseConfigured, reconcilePropertyDocument } from '../search/index.js';
 import { resolveMlsBoardName } from '../utils/mlsBoardName.js';
+import { buildPublicListingWhere, isMlsPublicDisplayEnabled } from 'search/propertyVisibility';
+import logger from '../utils/logger.js';
 
-const publicListingInclude = {
-  where: { status: ListingStatus.ACTIVE, idxDisplayable: true },
-  orderBy: [{ listDate: 'desc' as const }, { createdAt: 'desc' as const }],
-  take: 1,
-};
+async function reconcilePropertyDocumentBestEffort(propertyId: string): Promise<void> {
+  if (!isTypesenseConfigured()) return;
+  try {
+    await reconcilePropertyDocument(propertyId);
+  } catch (error) {
+    logger.error('Property Typesense reconciliation failed after DB write', { propertyId, error });
+  }
+}
+
+function listingWhere(additional: Prisma.ListingWhereInput | undefined, publicOnly: boolean) {
+  if (publicOnly) return buildPublicListingWhere(additional);
+  const baseline: Prisma.ListingWhereInput = { status: ListingStatus.ACTIVE, idxDisplayable: true };
+  return additional ? { AND: [baseline, additional] } : baseline;
+}
+
+function listingInclude(additional: Prisma.ListingWhereInput | undefined, publicOnly: boolean) {
+  return {
+    where: listingWhere(additional, publicOnly),
+    orderBy: [{ listDate: 'desc' as const }, { createdAt: 'desc' as const }],
+    take: 1,
+  };
+}
 
 function normalizeListingStatus(status?: string | null) {
   if (!status) return undefined;
@@ -22,13 +41,23 @@ function decimalToNumber(value: unknown) {
   return Number.isFinite(n) ? n : null;
 }
 
-function toPublicProperty(property) {
-  const { listings = [], ...base } = property;
+function parseListingStatus(value: unknown): ListingStatus | undefined {
+  if (typeof value !== 'string') return undefined;
+  const candidate = value.toUpperCase().replace(/\s+/g, '_');
+  return (Object.values(ListingStatus) as string[]).includes(candidate)
+    ? candidate as ListingStatus
+    : undefined;
+}
+
+function toPropertyResult(property, publicOnly: boolean) {
+  const { listings = [], media = [], ...base } = property;
   const listing = listings[0] ?? null;
-  const firstMediaUrl = base.media?.[0]?.url ?? null;
+  const exposePropertyMedia = !publicOnly || isMlsPublicDisplayEnabled();
+  const firstMediaUrl = exposePropertyMedia ? media[0]?.url ?? null : null;
 
   return {
     ...base,
+    media: exposePropertyMedia ? media : [],
     listingId: listing?.id ?? null,
     slug: listing?.slug ?? null,
     mlsId: listing?.mlsId ?? null,
@@ -42,8 +71,6 @@ function toPublicProperty(property) {
     imageUrl: listing?.imageUrl ?? firstMediaUrl,
     description: listing?.description ?? null,
     listingAgentName: listing?.listingAgentName ?? null,
-    listingAgentEmail: listing?.listingAgentEmail ?? null,
-    listingAgentPhone: listing?.listingAgentPhone ?? null,
     brokerageName: listing?.brokerageName ?? null,
     brokeragePhone: listing?.brokeragePhone ?? null,
   };
@@ -91,7 +118,11 @@ function buildPropertyTypeClause(propertyTypes) {
   return { propertyType: { in: propertyTypes } };
 }
 
-export async function getProperties(filters: Record<string, any> = {}) {
+export async function getProperties(
+  filters: Record<string, any> = {},
+  options: { publicOnly?: boolean } = {},
+) {
+  const publicOnly = options.publicOnly !== false;
   const {
       page = 1,
       limit = 20,
@@ -120,8 +151,24 @@ export async function getProperties(filters: Record<string, any> = {}) {
     const take = parseInt(limit);
 
     // Build where clause
+    const requestedStatus = parseListingStatus(status);
+    const requestedListingWhere: Prisma.ListingWhereInput = {
+      ...(status ? (requestedStatus ? { status: requestedStatus } : { status: { in: [] } }) : {}),
+      ...(minPrice || maxPrice
+        ? {
+            listPrice: {
+              ...(minPrice ? { gte: parseFloat(minPrice) } : {}),
+              ...(maxPrice ? { lte: parseFloat(maxPrice) } : {}),
+            },
+          }
+        : {}),
+    };
+    const requestedListingFilter = Object.keys(requestedListingWhere).length
+      ? requestedListingWhere
+      : undefined;
+    const matchedListingWhere = listingWhere(requestedListingFilter, publicOnly);
     const where: Prisma.PropertyWhereInput = {
-      listings: { some: { status: ListingStatus.ACTIVE, idxDisplayable: true } },
+      listings: { some: matchedListingWhere },
     };
 
     // Full-text search via Prisma (dedicated /api/search uses Typesense)
@@ -191,14 +238,14 @@ export async function getProperties(filters: Record<string, any> = {}) {
           media: {
             orderBy: { order: 'asc' }
           },
-          listings: publicListingInclude,
+          listings: listingInclude(requestedListingFilter, publicOnly),
         }
       }),
       prisma.property.count({ where })
     ]);
 
     return {
-      properties: properties.map(toPublicProperty),
+      properties: properties.map((property) => toPropertyResult(property, publicOnly)),
       pagination: {
         page: parseInt(page),
         currentPage: parseInt(page), // Add currentPage for frontend compatibility
@@ -213,21 +260,21 @@ export async function getProperties(filters: Record<string, any> = {}) {
 }
 
 export async function getPropertyById(id) {
-    const property = await prisma.property.findUnique({
-      where: { id },
+    const property = await prisma.property.findFirst({
+      where: { id, listings: { some: buildPublicListingWhere() } },
       include: {
         media: {
           orderBy: { order: 'asc' }
         },
-        listings: publicListingInclude,
+        listings: listingInclude(undefined, true),
       }
     });
-    return property ? toPublicProperty(property) : null;
+    return property ? toPropertyResult(property, true) : null;
   }
 
 export async function getPropertyBySlug(slug) {
-    const listing = await prisma.listing.findUnique({
-      where: { slug },
+    const listing = await prisma.listing.findFirst({
+      where: buildPublicListingWhere({ slug }),
       include: {
         property: {
           include: {
@@ -236,8 +283,8 @@ export async function getPropertyBySlug(slug) {
         },
       }
     });
-    if (!listing?.property || !listing.idxDisplayable || listing.status !== ListingStatus.ACTIVE) return null;
-    return toPublicProperty({ ...listing.property, listings: [listing] });
+    if (!listing?.property) return null;
+    return toPropertyResult({ ...listing.property, listings: [listing] }, true);
   }
 
 /**
@@ -266,7 +313,7 @@ export async function createProperty(data) {
       }
     });
 
-    upsertDocument('properties', toPropertyDoc(property));
+    await reconcilePropertyDocumentBestEffort(property.id);
 
     return property;
   }
@@ -288,7 +335,7 @@ export async function updateProperty(id, data) {
         }
       });
 
-      upsertDocument('properties', toPropertyDoc(property, property.listings[0]));
+      await reconcilePropertyDocumentBestEffort(property.id);
 
       return property;
     } catch (error) {
@@ -301,16 +348,12 @@ export async function updateProperty(id, data) {
 
 export async function deleteProperty(id) {
     try {
-      // Get the property before deleting for search index removal
-      const property = await prisma.property.findUnique({
-        where: { id }
-      });
-
+      if (isTypesenseConfigured()) await deleteDocument('properties', id);
       await prisma.property.delete({
         where: { id }
       });
 
-      if (property) deleteDocument('properties', property.id);
+      await reconcilePropertyDocumentBestEffort(id);
 
       return true;
     } catch (error) {
@@ -322,10 +365,12 @@ export async function deleteProperty(id) {
   }
 
 export async function getPropertyMedia(propertyId) {
-    return await prisma.media.findMany({
-      where: { propertyId },
-      orderBy: { order: 'asc' }
+    if (!isMlsPublicDisplayEnabled()) return [];
+    const property = await prisma.property.findFirst({
+      where: { id: propertyId, listings: { some: buildPublicListingWhere() } },
+      select: { media: { orderBy: { order: 'asc' } } },
     });
+    return property?.media ?? [];
   }
 
 export async function addPropertyMedia(propertyId, mediaData) {

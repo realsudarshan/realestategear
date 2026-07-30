@@ -1,13 +1,10 @@
 import { describe, it, expect, beforeEach, afterAll, vi } from 'vitest';
 
-// Capture the indexed doc; force storage "configured"; stub the media download.
+// Capture reconciliation; force storage "configured"; stub the media download.
 vi.mock('search', () => ({
-  upsertDocument: vi.fn(async () => {}),
-  deleteDocument: vi.fn(async () => {}),
-  toPropertyDoc: (p: { id: string }, l: { imageUrl?: string | null } | null) => ({
-    id: p.id,
-    imageUrl: l?.imageUrl ?? undefined,
-  }),
+  deleteDocument: vi.fn(async () => undefined),
+  isTypesenseConfigured: vi.fn(() => true),
+  reconcilePropertyDocument: vi.fn(async () => 'upserted'),
 }));
 vi.mock('../../../src/storage/s3.js', () => ({ isStorageConfigured: () => true }));
 vi.mock('../../../src/sync/media.js', () => ({
@@ -15,7 +12,7 @@ vi.mock('../../../src/sync/media.js', () => ({
 }));
 
 import { prisma } from 'db';
-import { upsertDocument } from 'search';
+import { reconcilePropertyDocument } from 'search';
 import { syncPropertyMedia } from '../../../src/sync/media.js';
 import { processPropertyRecord } from '../../../src/sync/persistence.js';
 import type { ResoPropertyRecord } from '../../../src/connectors/reso/types.js';
@@ -60,9 +57,9 @@ describe('processPropertyRecord media wiring (D7)', () => {
     // imageUrl persisted on the listing
     const listing = await prisma.listing.findUnique({ where: { listingKey: 'CARKEY1' } });
     expect(listing?.imageUrl).toBe('https://cdn.test/primary.jpg');
-    // and reflected in the search doc
-    const doc = vi.mocked(upsertDocument).mock.calls[0][1] as { imageUrl?: string };
-    expect(doc.imageUrl).toBe('https://cdn.test/primary.jpg');
+    // Reconciliation runs after the image URL is persisted, so it reads the
+    // updated listing when constructing the search document.
+    expect(vi.mocked(reconcilePropertyDocument)).toHaveBeenCalledOnce();
   });
 
   it('skips media entirely when no access token is configured', async () => {

@@ -7,6 +7,7 @@ import { mockProperty, mockPropertyFilters } from '../utils/fixtures.js';
 describe('Properties Routes - integration tests', () => {
   let app;
   let prisma;
+  const originalMlsDisplay = process.env.MLS_PUBLIC_DISPLAY_ENABLED;
 
   beforeAll(async () => {
     const testApp = await createTestApp();
@@ -16,9 +17,12 @@ describe('Properties Routes - integration tests', () => {
 
   afterAll(async () => {
     await closeTestApp();
+    if (originalMlsDisplay === undefined) delete process.env.MLS_PUBLIC_DISPLAY_ENABLED;
+    else process.env.MLS_PUBLIC_DISPLAY_ENABLED = originalMlsDisplay;
   });
 
   beforeEach(async () => {
+    process.env.MLS_PUBLIC_DISPLAY_ENABLED = 'true';
     await clearDatabase(prisma);
   });
 
@@ -83,6 +87,32 @@ describe('Properties Routes - integration tests', () => {
         description: 'Test listing description',
         brokerageName: 'Test Brokerage',
       });
+    });
+
+    it('preserves a MANUAL listing but suppresses shared media for a mixed-source property when MLS display is disabled', async () => {
+      process.env.MLS_PUBLIC_DISPLAY_ENABLED = 'false';
+      const property = await prisma.property.findFirstOrThrow({ where: { city: 'Austin' } });
+      await prisma.listing.create({
+        data: {
+          propertyId: property.id,
+          source: 'MANUAL',
+          status: 'ACTIVE',
+          slug: 'manual-public-listing',
+          imageUrl: 'https://example.com/manual-listing.jpg',
+          listPrice: 450000,
+          listDate: new Date('2026-07-01T00:00:00.000Z'),
+        },
+      });
+      await prisma.media.create({ data: { propertyId: property.id, url: 'https://example.com/shared-property.jpg', order: 0 } });
+
+      const response = await request(app).get('/api/properties?city=Austin');
+
+      expect(response.status).toBe(200);
+      expect(response.body.properties).toEqual(expect.arrayContaining([
+        expect.objectContaining({ id: property.id, slug: 'manual-public-listing', imageUrl: 'https://example.com/manual-listing.jpg', media: [] }),
+      ]));
+      const mediaResponse = await request(app).get(`/api/properties/${property.id}/media`);
+      expect(mediaResponse.body).toEqual([]);
     });
 
     it('should filter properties by bedrooms', async () => {
@@ -224,6 +254,15 @@ describe('Properties Routes - integration tests', () => {
 
       expect(response.status).toBe(404);
       // Route uses { message } not { error } for 404 responses
+      expect(response.body.message).toBe('Property not found');
+    });
+
+    it('returns 404 for an MLS-only property when public MLS display is disabled', async () => {
+      process.env.MLS_PUBLIC_DISPLAY_ENABLED = 'false';
+
+      const response = await request(app).get(`/api/properties/${testProperty.id}`);
+
+      expect(response.status).toBe(404);
       expect(response.body.message).toBe('Property not found');
     });
 

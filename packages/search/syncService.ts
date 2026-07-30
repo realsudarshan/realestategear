@@ -8,14 +8,21 @@ export async function upsertDocument(collection: string, doc: Record<string, unk
     await client.collections(collection).documents().upsert(doc);
   } catch (err) {
     logger.error(`Typesense upsert failed [${collection}:${doc.id}]`, err);
+    throw err;
   }
+}
+
+function isNotFoundError(err: unknown): boolean {
+  return typeof err === 'object' && err !== null && 'httpStatus' in err && err.httpStatus === 404;
 }
 
 export async function deleteDocument(collection: string, id: string) {
   try {
     await client.collections(collection).documents(id).delete();
   } catch (err) {
+    if (isNotFoundError(err)) return;
     logger.error(`Typesense delete failed [${collection}:${id}]`, err);
+    throw err;
   }
 }
 
@@ -57,14 +64,79 @@ export async function searchDocuments(
 export async function reindexAll(
   collection: string,
   fetchDocs: () => Promise<Record<string, unknown>[]>,
+  options: {
+    exact?: boolean;
+    reconcile?: (id: string) => Promise<unknown>;
+  } = {},
 ) {
+  const existingIds = new Set<string>();
+  if (options.exact) {
+    const exported = await client.collections(collection).documents().export({ include_fields: 'id' });
+    for (const [index, line] of exported.split('\n').entries()) {
+      if (!line.trim()) continue;
+      let document: unknown;
+      try {
+        document = JSON.parse(line);
+      } catch {
+        throw new Error(`Typesense reindex export contains invalid JSON on line ${index + 1} [${collection}]`);
+      }
+      if (
+        typeof document !== 'object'
+        || document === null
+        || !('id' in document)
+        || typeof document.id !== 'string'
+        || !document.id
+      ) {
+        throw new Error(`Typesense reindex export is missing a string id on line ${index + 1} [${collection}]`);
+      }
+      existingIds.add(document.id);
+    }
+  }
+
   const docs = await fetchDocs();
-  if (!docs.length) return;
+  const desiredIds = new Set<string>();
+  for (const doc of docs) {
+    if (typeof doc.id !== 'string' || !doc.id) {
+      throw new Error(`Typesense reindex document is missing a string id [${collection}]`);
+    }
+    desiredIds.add(doc.id);
+  }
 
-  await client
-    .collections(collection)
-    .documents()
-    .import(docs, { action: 'upsert' });
+  if (docs.length) {
+    const importResults = await client
+      .collections(collection)
+      .documents()
+      .import(docs, { action: 'upsert', throwOnFail: false });
 
-  logger.info(`Typesense reindex complete: ${collection} (${docs.length} docs)`);
+    if (importResults.length !== docs.length) {
+      throw new Error(
+        `Typesense reindex import returned ${importResults.length} results for ${docs.length} documents [${collection}]`,
+      );
+    }
+    const failures = importResults.filter((result) => !result.success);
+    if (failures.length) {
+      throw new Error(
+        `Typesense reindex import failed for ${failures.length}/${docs.length} documents [${collection}]: ${failures.map((failure) => failure.error).join('; ')}`,
+      );
+    }
+  }
+
+  const staleIds = options.exact
+    ? [...existingIds].filter((id) => !desiredIds.has(id))
+    : [];
+  for (const id of staleIds) await deleteDocument(collection, id);
+
+  if (options.reconcile) {
+    for (const id of new Set([...existingIds, ...desiredIds])) await options.reconcile(id);
+  }
+
+  const counts = {
+    desiredCount: desiredIds.size,
+    upsertedCount: docs.length,
+    deletedCount: staleIds.length,
+  };
+  logger.info(
+    `Typesense reindex complete: ${collection} (${counts.upsertedCount} upserted, ${counts.deletedCount} deleted)`,
+  );
+  return counts;
 }

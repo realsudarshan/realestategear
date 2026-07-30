@@ -1,10 +1,13 @@
-import { vi, describe, it, expect, beforeEach } from 'vitest';
+import { vi, describe, it, expect, beforeEach, afterAll } from 'vitest';
 
 const mockPrisma = vi.hoisted(() => ({
   portal: {
     findUnique: vi.fn(),
     create: vi.fn(),
   },
+  geographicArea: { findFirst: vi.fn() },
+  listingCollection: { findFirst: vi.fn() },
+  property: { findMany: vi.fn() },
 }));
 
 const mockCreateInquiry = vi.hoisted(() => vi.fn());
@@ -13,7 +16,7 @@ const mockGetPortalListings = vi.hoisted(() => vi.fn().mockResolvedValue({ prope
 const mockGetPortalProperty = vi.hoisted(() => vi.fn());
 const mockGetPortalReadiness = vi.hoisted(() => vi.fn());
 
-vi.mock('db', () => ({ prisma: mockPrisma }));
+vi.mock('db', () => ({ prisma: mockPrisma, ListingStatus: { ACTIVE: 'ACTIVE' }, ListingSource: { MLS: 'MLS', MANUAL: 'MANUAL', ZILLOW: 'ZILLOW', REALTOR_COM: 'REALTOR_COM' } }));
 vi.mock('../../../search/index.js', () => ({ searchDocuments: mockSearchDocuments }));
 vi.mock('../../../services/portalReadinessService.js', () => ({
   getPortalListings: mockGetPortalListings,
@@ -44,6 +47,7 @@ vi.mock('../../../utils/logger.js', () => ({
 const { default: express } = await import('express');
 const { default: router } = await import('../../../routes/portalPublic.js');
 const { default: request } = await import('supertest');
+const originalMlsDisplay = process.env.MLS_PUBLIC_DISPLAY_ENABLED;
 
 function buildApp() {
   const app = express();
@@ -69,7 +73,8 @@ const ACTIVE_PORTAL = {
 };
 
 describe('GET /slug/:slug', () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => { vi.clearAllMocks(); delete process.env.MLS_PUBLIC_DISPLAY_ENABLED; });
+  afterAll(() => { if (originalMlsDisplay === undefined) delete process.env.MLS_PUBLIC_DISPLAY_ENABLED; else process.env.MLS_PUBLIC_DISPLAY_ENABLED = originalMlsDisplay; });
 
   it('returns portal data for active portal', async () => {
     mockPrisma.portal.findUnique.mockResolvedValue(ACTIVE_PORTAL);
@@ -106,6 +111,23 @@ describe('GET /slug/:slug', () => {
     const res = await request(buildApp()).get('/slug/myrtle-beach');
     expect(res.status).toBe(200);
     expect(res.body).not.toHaveProperty('suspendedAt');
+  });
+
+  it('gates featured listings dynamically while MLS display is disabled', async () => {
+    mockPrisma.portal.findUnique.mockResolvedValue({ ...ACTIVE_PORTAL, suspendedAt: null });
+    await request(buildApp()).get('/slug/myrtle-beach');
+    expect(mockPrisma.portal.findUnique.mock.calls[0][0].select.featuredListings.where).toEqual({
+      listing: { is: { status: 'ACTIVE', idxDisplayable: true, source: { not: 'MLS' } } },
+    });
+  });
+
+  it('allows MLS featured listings only when explicitly enabled', async () => {
+    process.env.MLS_PUBLIC_DISPLAY_ENABLED = 'true';
+    mockPrisma.portal.findUnique.mockResolvedValue({ ...ACTIVE_PORTAL, suspendedAt: null });
+    await request(buildApp()).get('/slug/myrtle-beach');
+    expect(mockPrisma.portal.findUnique.mock.calls[0][0].select.featuredListings.where).toEqual({
+      listing: { is: { status: 'ACTIVE', idxDisplayable: true } },
+    });
   });
 });
 
@@ -272,6 +294,33 @@ describe('GET /slug/:slug/properties/:identifier', () => {
 
     expect(res.status).toBe(404);
     expect(mockGetPortalProperty).not.toHaveBeenCalled();
+  });
+});
+
+describe.each([
+  ['area', '/slug/myrtle-beach/areas/downtown'],
+  ['collection', '/slug/myrtle-beach/collections/luxury'],
+])('GET portal %s landing', (kind, path) => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    delete process.env.MLS_PUBLIC_DISPLAY_ENABLED;
+    mockPrisma.portal.findUnique.mockResolvedValue({ id: 'p1', accountId: 'a1', slug: 'myrtle-beach', isActive: true, suspendedAt: null, collections: [] });
+    mockGetPortalReadiness.mockResolvedValue({ canShowListings: true });
+    mockPrisma.geographicArea.findFirst.mockResolvedValue({ id: 'area-1', slug: 'downtown', name: 'Downtown', description: null });
+    mockPrisma.listingCollection.findFirst.mockResolvedValue({ id: 'collection-1', slug: 'luxury', name: 'Luxury', description: null, predicate: {} });
+    mockPrisma.property.findMany.mockResolvedValue([]);
+  });
+
+  it('gates both parent eligibility and nested representative listings', async () => {
+    const res = await request(buildApp()).get(path);
+
+    expect(res.status).toBe(200);
+    const query = mockPrisma.property.findMany.mock.calls[0][0];
+    expect(JSON.stringify(query.where)).toContain('"source":{"not":"MLS"}');
+    expect(JSON.stringify(query.include.listings.where)).toContain('"source":{"not":"MLS"}');
+    expect(res.body.properties).toEqual([]);
+    if (kind === 'area') expect(mockPrisma.geographicArea.findFirst).toHaveBeenCalledOnce();
+    else expect(mockPrisma.listingCollection.findFirst).toHaveBeenCalledOnce();
   });
 });
 

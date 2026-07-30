@@ -76,11 +76,7 @@ router.get('/', async (req, res, next) => {
         () => searchTypesense('transactions', `accountId:=${accountId}`),
         () => searchTransactionsPg({ accountId, q, limit: perPage }),
       ),
-      withFallback(
-        'properties',
-        () => searchTypesense('properties', undefined),
-        () => searchPropertiesPg({ q, limit: perPage }),
-      ),
+      searchPropertiesPg({ q, limit: perPage, publicOnly: false }),
       withFallback(
         'tasks',
         () => searchTypesense('tasks', `assignedToId:=${userId}`),

@@ -1,5 +1,5 @@
 import { prisma } from 'db';
-import { upsertDocument, toPropertyDoc } from '../search/index.js';
+import { deleteDocument, isTypesenseConfigured, reconcilePropertyDocument } from '../search/index.js';
 import logger from '../utils/logger.js';
 
 // Refresh the Typesense `properties` doc for a property when its listing
@@ -10,22 +10,9 @@ import logger from '../utils/logger.js';
 // Idempotent: safe to call multiple times. Errors are logged but don't fail
 // the caller — Typesense should be best-effort relative to the DB write.
 async function refreshPropertyDoc(propertyId: string): Promise<void> {
+  if (!isTypesenseConfigured()) return;
   try {
-    const property = await prisma.property.findUnique({
-      where: { id: propertyId },
-      include: {
-        listings: {
-          where: { status: 'ACTIVE' },
-          orderBy: { listDate: 'desc' },
-          take: 1,
-        },
-      },
-    });
-    if (!property) {
-      logger.warn(`refreshPropertyDoc: property ${propertyId} not found`);
-      return;
-    }
-    await upsertDocument('properties', toPropertyDoc(property, property.listings[0]));
+    await reconcilePropertyDocument(propertyId);
   } catch (err) {
     logger.error(`refreshPropertyDoc failed for ${propertyId}:`, err);
   }
@@ -58,8 +45,13 @@ export async function updateListing(
   where: Parameters<typeof prisma.listing.update>[0]['where'],
   data: Parameters<typeof prisma.listing.update>[0]['data'],
 ) {
+  const previous = await prisma.listing.findUnique({ where, select: { propertyId: true } });
+  if (previous && isTypesenseConfigured()) await deleteDocument('properties', previous.propertyId);
   const listing = await prisma.listing.update({ where, data });
-  await refreshPropertyDoc(listing.propertyId);
+  await Promise.all(
+    [...new Set([previous?.propertyId, listing.propertyId].filter((id): id is string => Boolean(id)))]
+      .map(refreshPropertyDoc),
+  );
   return listing;
 }
 
@@ -74,6 +66,8 @@ export async function updateListing(
 export async function deleteListing(
   where: Parameters<typeof prisma.listing.delete>[0]['where'],
 ) {
+  const previous = await prisma.listing.findUnique({ where, select: { propertyId: true } });
+  if (previous && isTypesenseConfigured()) await deleteDocument('properties', previous.propertyId);
   const listing = await prisma.listing.delete({ where });
   await refreshPropertyDoc(listing.propertyId);
   return listing;

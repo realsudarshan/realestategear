@@ -74,7 +74,7 @@ describe('GET /api/agent/search — Postgres fallback', () => {
     expect(res.body.contacts.items).not.toEqual([]);
   });
 
-  it('uses Typesense results directly when it succeeds, without touching Postgres', async () => {
+  it('uses Typesense for account collections but always uses non-public Postgres property search', async () => {
     mockIsTypesenseConfigured.mockReturnValue(true);
     mockSearchDocuments.mockResolvedValue({ hits: [{ document: { id: 'ts-1' } }], found: 1 });
 
@@ -82,6 +82,9 @@ describe('GET /api/agent/search — Postgres fallback', () => {
 
     expect(res.status).toBe(200);
     expect(res.body.contacts).toEqual({ items: [{ id: 'ts-1' }], total: 1 });
+    expect(res.body.properties).toEqual(PG_RESULT);
     expect(mockSearchContactsPg).not.toHaveBeenCalled();
+    expect(mockSearchPropertiesPg).toHaveBeenCalledWith({ q: 'jane', limit: 8, publicOnly: false });
+    expect(mockSearchDocuments).not.toHaveBeenCalledWith('properties', expect.anything());
   });
 });

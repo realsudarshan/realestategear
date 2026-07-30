@@ -13,7 +13,9 @@
     "./syncService": "./syncService.ts",
     "./logger": "./logger.ts",
     "./postgresFallback": "./postgresFallback.ts",
-    "./collectionPredicate": "./collectionPredicate.ts"
+    "./collectionPredicate": "./collectionPredicate.ts",
+    "./propertyVisibility": "./propertyVisibility.ts",
+    "./reconcilePropertyDocument": "./reconcilePropertyDocument.ts"
   },
   "dependencies": {
     "@realestategear/portal-config": "*",

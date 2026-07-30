@@ -1,7 +1,8 @@
 import { parseCollectionPredicate, type CollectionPredicate, type NumericPredicate } from '@realestategear/portal-config';
 import { ListingStatus, type Prisma, type PropertyType } from 'db';
+import { buildPublicListingWhere } from './propertyVisibility.js';
 
-export interface CollectionScope { accountId: string; portalId: string; boardIds: string[]; collectionId?: string }
+export interface CollectionScope { accountId: string; portalId: string; boardIds: string[]; collectionId?: string; publicVisibility?: boolean }
 
 function scalarNumber(field: string, rule: NumericPredicate): Prisma.PropertyWhereInput {
   if (rule.nulls === 'only') return { [field]: null } as Prisma.PropertyWhereInput;
@@ -30,13 +31,21 @@ export function compileCollectionPredicate(value: unknown, scope: CollectionScop
   if (price?.nulls === 'only') priceWhere = { listPrice: null };
   else if (price && price.nulls === 'exclude') priceWhere = { listPrice: { ...(price.min != null ? { gte: price.min } : {}), ...(price.max != null ? { lte: price.max } : {}) } };
   // include means a null or in-range listing; model as two eligible-listing branches.
-  const baseListing: Prisma.ListingWhereInput = { status: ListingStatus.ACTIVE, idxDisplayable: true, ...(scope.boardIds.length ? { mlsBoardId: { in: scope.boardIds } } : {}) };
+  const baseListing = (additional?: Prisma.ListingWhereInput): Prisma.ListingWhereInput => {
+    const where = {
+      ...(scope.boardIds.length ? { mlsBoardId: { in: scope.boardIds } } : {}),
+      ...additional,
+    };
+    return scope.publicVisibility
+      ? buildPublicListingWhere(where)
+      : { status: ListingStatus.ACTIVE, idxDisplayable: true, ...where };
+  };
   const eligibility: Prisma.PropertyWhereInput = price?.nulls === 'include'
     ? { OR: [
-        { listings: { some: { ...baseListing, listPrice: null } } },
-        { listings: { some: { ...baseListing, listPrice: { ...(price.min != null ? { gte: price.min } : {}), ...(price.max != null ? { lte: price.max } : {}) } } } },
+        { listings: { some: baseListing({ listPrice: null }) } },
+        { listings: { some: baseListing({ listPrice: { ...(price.min != null ? { gte: price.min } : {}), ...(price.max != null ? { lte: price.max } : {}) } }) } },
       ] }
-    : { listings: { some: { ...baseListing, ...priceWhere } } };
+    : { listings: { some: baseListing(priceWhere) } };
 
   if (!scope.collectionId) return { AND: [eligibility, ...predicateAnd] };
   // EXCLUDE is an authoritative veto. INCLUDE bypasses the predicate only.

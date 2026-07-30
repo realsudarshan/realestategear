@@ -1,4 +1,7 @@
 import Typesense from 'typesense';
+import { buildPublicPropertyTypesenseFilter } from 'search/propertyVisibility';
+
+const SEARCH_KEY_TTL_SECONDS = 60 * 60;
 
 // Keys are generated from the admin key — this client is only used for key generation
 const adminClient = new Typesense.Client({
@@ -16,8 +19,12 @@ const adminClient = new Typesense.Client({
 export function generateWebSearchKey(): string {
   return adminClient.keys().generateScopedSearchKey(
     process.env.TYPESENSE_API_KEY!,
-    // @ts-ignore — SDK types are incomplete; collection + filter_by are valid scoped key params
-    { collection: 'properties', filter_by: 'status:=[Active,Pending]' },
+    {
+      // @ts-expect-error - Typesense supports collection-scoped keys but omits it from this SDK type.
+      collection: 'properties',
+      filter_by: buildPublicPropertyTypesenseFilter(),
+      expires_at: Math.floor(Date.now() / 1000) + SEARCH_KEY_TTL_SECONDS,
+    },
   );
 }
 
@@ -25,6 +32,9 @@ export function generateAgentSearchKey(accountId: string): string {
   // @ts-ignore
   return adminClient.keys().generateScopedSearchKey(
     process.env.TYPESENSE_API_KEY!,
-    { filter_by: `accountId:=${accountId}` },
+    {
+      filter_by: `(accountId:=${accountId}) || (${buildPublicPropertyTypesenseFilter()})`,
+      expires_at: Math.floor(Date.now() / 1000) + SEARCH_KEY_TTL_SECONDS,
+    },
   );
 }

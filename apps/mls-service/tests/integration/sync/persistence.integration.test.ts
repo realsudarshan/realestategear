@@ -3,18 +3,18 @@ import { describe, it, expect, beforeEach, afterAll, vi } from 'vitest';
 // Mock the shared search package so these DB-focused tests don't hit Typesense.
 // We assert the search ops were called, and assert real DB state.
 vi.mock('search', () => ({
-  upsertDocument: vi.fn(async () => {}),
-  deleteDocument: vi.fn(async () => {}),
-  toPropertyDoc: (p: { id: string }, l: { status?: string; listingKey?: string } | null) => ({
-    id: p.id,
-    status: l?.status,
-    listingKey: l?.listingKey,
-  }),
+  deleteDocument: vi.fn(async () => undefined),
+  isTypesenseConfigured: vi.fn(() => true),
+  reconcilePropertyDocument: vi.fn(async () => 'upserted'),
 }));
 
 import { prisma } from 'db';
-import { upsertDocument, deleteDocument } from 'search';
-import { processPropertyRecord, type MlsPersistenceConfig } from '../../../src/sync/persistence.js';
+import { deleteDocument, reconcilePropertyDocument } from 'search';
+import {
+  processPropertyRecord,
+  SearchIndexReconciliationError,
+  type MlsPersistenceConfig,
+} from '../../../src/sync/persistence.js';
 import type { ResoPropertyRecord } from '../../../src/connectors/reso/types.js';
 
 const config: MlsPersistenceConfig = {
@@ -72,7 +72,7 @@ describe('processPropertyRecord — upsert (D11/D12/D17)', () => {
     expect(listing!.listingKey).toBe('CANOPYKEY_A');
     expect(listing!.mlsId).toBe('12345');
 
-    expect(vi.mocked(upsertDocument)).toHaveBeenCalledOnce();
+    expect(vi.mocked(reconcilePropertyDocument)).toHaveBeenCalledOnce();
   });
 
   it('is idempotent — re-processing the same record updates, not duplicates', async () => {
@@ -84,6 +84,18 @@ describe('processPropertyRecord — upsert (D11/D12/D17)', () => {
     const listings = await prisma.listing.findMany({ where: { listingKey: 'CANOPYKEY_B' } });
     expect(listings).toHaveLength(1);
     expect(Number(listings[0].listPrice)).toBe(450000);
+  });
+
+  it('aborts an existing-record upsert before changing the database when pre-delete fails', async () => {
+    const rec = makeRecord({ ListingKey: 'KEY_PREDELETE', ListPrice: 400000 });
+    await processPropertyRecord(rec, config);
+    vi.mocked(deleteDocument).mockRejectedValueOnce(new Error('typesense unavailable'));
+
+    await expect(processPropertyRecord({ ...rec, ListPrice: 450000 }, config))
+      .rejects.toBeInstanceOf(SearchIndexReconciliationError);
+
+    const listing = await prisma.listing.findUnique({ where: { listingKey: 'KEY_PREDELETE' } });
+    expect(Number(listing?.listPrice)).toBe(400000);
   });
 
   it('a relisting (same parcel, new ListingKey) reuses one Property (D11)', async () => {
@@ -116,6 +128,33 @@ describe('processPropertyRecord — upsert (D11/D12/D17)', () => {
     });
     expect(new Set(listings.map((l) => l.propertyId)).size).toBe(2); // distinct units, distinct properties
   });
+
+  it('serializes concurrent reconciliation for listings sharing one property', async () => {
+    const parcel = 'PARCEL_RECONCILE';
+    const first = makeRecord({ ListingKey: 'RECONCILE_A', ParcelNumber: parcel });
+    const second = makeRecord({ ListingKey: 'RECONCILE_B', ParcelNumber: parcel });
+    await processPropertyRecord(first, config);
+    await processPropertyRecord(second, config);
+    vi.mocked(reconcilePropertyDocument).mockClear();
+
+    let active = 0;
+    let maxActive = 0;
+    vi.mocked(reconcilePropertyDocument).mockImplementation(async () => {
+      active += 1;
+      maxActive = Math.max(maxActive, active);
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      active -= 1;
+      return 'upserted';
+    });
+
+    await Promise.all([
+      processPropertyRecord({ ...first, StandardStatus: 'Withdrawn' }, config),
+      processPropertyRecord({ ...second, StandardStatus: 'Withdrawn' }, config),
+    ]);
+
+    expect(vi.mocked(reconcilePropertyDocument)).toHaveBeenCalledTimes(2);
+    expect(maxActive).toBe(1);
+  });
 });
 
 describe('processPropertyRecord — status mapping (D10)', () => {
@@ -133,13 +172,14 @@ describe('processPropertyRecord — removal (D5)', () => {
   it('MlgCanView=false marks the listing WITHDRAWN and removes its search doc', async () => {
     const rec = makeRecord({ ListingKey: 'KEY_GONE' });
     await processPropertyRecord(rec, config); // create (active)
+    vi.mocked(reconcilePropertyDocument).mockClear();
 
     const result = await processPropertyRecord({ ...rec, MlgCanView: false }, config);
 
     expect(result.outcome).toBe('removed');
     const listing = await prisma.listing.findUnique({ where: { listingKey: 'KEY_GONE' } });
     expect(listing!.status).toBe('WITHDRAWN');
-    expect(vi.mocked(deleteDocument)).toHaveBeenCalledOnce();
+    expect(vi.mocked(reconcilePropertyDocument)).toHaveBeenCalledOnce();
   });
 
   it('removing a never-seen listing is a no-op (skipped)', async () => {
@@ -148,7 +188,7 @@ describe('processPropertyRecord — removal (D5)', () => {
       config,
     );
     expect(result.outcome).toBe('skipped');
-    expect(vi.mocked(deleteDocument)).not.toHaveBeenCalled();
+    expect(vi.mocked(reconcilePropertyDocument)).not.toHaveBeenCalled();
   });
 
   it('a vendor with no viewableFlagField configured never removes on flag grounds — relies purely on StandardStatus', async () => {
@@ -178,16 +218,14 @@ describe('processPropertyRecord — IDX display compliance (D19)', () => {
     expect(listing).not.toBeNull();
     expect(listing!.idxDisplayable).toBe(false);
     // not indexed; actively removed from the public search index
-    expect(vi.mocked(upsertDocument)).not.toHaveBeenCalled();
-    expect(vi.mocked(deleteDocument)).toHaveBeenCalledOnce();
+    expect(vi.mocked(reconcilePropertyDocument)).toHaveBeenCalledOnce();
   });
 
   it('a normally-displayable listing is indexed', async () => {
     await processPropertyRecord(makeRecord({ ListingKey: 'KEY_SHOWN' }), config);
     const listing = await prisma.listing.findUnique({ where: { listingKey: 'KEY_SHOWN' } });
     expect(listing!.idxDisplayable).toBe(true);
-    expect(vi.mocked(upsertDocument)).toHaveBeenCalledOnce();
-    expect(vi.mocked(deleteDocument)).not.toHaveBeenCalled();
+    expect(vi.mocked(reconcilePropertyDocument)).toHaveBeenCalledOnce();
   });
 
   it('public-display kill-switch off: a displayable listing is stored but NOT indexed (T15)', async () => {
@@ -198,7 +236,9 @@ describe('processPropertyRecord — IDX display compliance (D19)', () => {
 
     const listing = await prisma.listing.findUnique({ where: { listingKey: 'KEY_GATED' } });
     expect(listing).not.toBeNull(); // still in the DB
-    expect(vi.mocked(upsertDocument)).not.toHaveBeenCalled(); // never publicly indexed
-    expect(vi.mocked(deleteDocument)).toHaveBeenCalledOnce();
+    expect(vi.mocked(reconcilePropertyDocument)).toHaveBeenCalledWith(
+      listing!.propertyId,
+      { MLS_PUBLIC_DISPLAY_ENABLED: 'false' },
+    );
   });
 });

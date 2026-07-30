@@ -53,7 +53,7 @@ vi.doMock('../../routes/portalAuth.js', () => {
 });
 
 vi.doMock('../../services/bootstrapAdmin.js', () => ({ ensureBootstrapAdmin: vi.fn() }));
-vi.doMock('../../search/index.js', () => ({ ensureCollections: vi.fn() }));
+vi.doMock('../../search/index.js', () => ({ ensureCollections: vi.fn(), isTypesenseConfigured: vi.fn(() => false) }));
 vi.doMock('../../utils/logger.js', () => ({
   default: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));

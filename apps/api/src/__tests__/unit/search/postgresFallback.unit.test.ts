@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockPrisma = vi.hoisted(() => ({
   contact: { findMany: vi.fn(), count: vi.fn() },
@@ -10,6 +10,7 @@ const mockPrisma = vi.hoisted(() => ({
 vi.mock('db', () => ({
   prisma: mockPrisma,
   ListingStatus: { ACTIVE: 'ACTIVE', COMING_SOON: 'COMING_SOON', SOLD: 'SOLD' },
+  ListingSource: { MLS: 'MLS', MANUAL: 'MANUAL', ZILLOW: 'ZILLOW', REALTOR_COM: 'REALTOR_COM' },
   PropertyType: {
     SINGLE_FAMILY: 'SINGLE_FAMILY',
     CONDO: 'CONDO',
@@ -27,6 +28,7 @@ const {
   searchTasksPg,
   searchPropertiesPg,
 } = await import('search/postgresFallback');
+const originalMlsDisplay = process.env.MLS_PUBLIC_DISPLAY_ENABLED;
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -39,6 +41,12 @@ beforeEach(() => {
   mockPrisma.property.findMany.mockResolvedValue([]);
   mockPrisma.property.count.mockResolvedValue(0);
   delete process.env.TYPESENSE_HOST;
+  delete process.env.MLS_PUBLIC_DISPLAY_ENABLED;
+});
+
+afterAll(() => {
+  if (originalMlsDisplay === undefined) delete process.env.MLS_PUBLIC_DISPLAY_ENABLED;
+  else process.env.MLS_PUBLIC_DISPLAY_ENABLED = originalMlsDisplay;
 });
 
 describe('isTypesenseConfigured', () => {
@@ -124,21 +132,47 @@ describe('searchTasksPg', () => {
 });
 
 describe('searchPropertiesPg', () => {
-  it('applies no listing filter when no price/status params are given', async () => {
+  it('always applies the public listing baseline when no price/status params are given', async () => {
     await searchPropertiesPg({ q: 'charlotte' });
     const { where } = mockPrisma.property.findMany.mock.calls[0][0];
-    expect(where.listings).toBeUndefined();
+    expect(where.listings.some).toEqual({ status: 'ACTIVE', idxDisplayable: true, source: { not: 'MLS' } });
   });
 
   it('scopes matching by price via listings.some, independent of the display listing', async () => {
     await searchPropertiesPg({ minPrice: 400000, maxPrice: 800000 });
     const { where, include } = mockPrisma.property.findMany.mock.calls[0][0];
-    expect(where.listings).toEqual({
-      some: { listPrice: { gte: 400000, lte: 800000 } },
+    expect(where.listings.some).toEqual({
+      AND: [
+        { status: 'ACTIVE', idxDisplayable: true, source: { not: 'MLS' } },
+        { listPrice: { gte: 400000, lte: 800000 } },
+      ],
     });
-    // Display listing selection is always most-recent-ACTIVE, regardless of
-    // the match-time price filter above.
-    expect(include.listings.where).toEqual({ status: 'ACTIVE' });
+    expect(include.listings.where).toEqual({ status: 'ACTIVE', idxDisplayable: true, source: { not: 'MLS' } });
+  });
+
+  it('cannot match a hidden listing by status and fails closed for non-public status', async () => {
+    await searchPropertiesPg({ status: 'SOLD' });
+    expect(mockPrisma.property.findMany.mock.calls[0][0].where.listings.some).toEqual({
+      AND: [
+        { status: 'ACTIVE', idxDisplayable: true, source: { not: 'MLS' } },
+        { status: 'SOLD' },
+      ],
+    });
+  });
+
+  it('preserves MLS listings only when explicitly enabled', async () => {
+    process.env.MLS_PUBLIC_DISPLAY_ENABLED = 'true';
+    await searchPropertiesPg({});
+    const { where, include } = mockPrisma.property.findMany.mock.calls[0][0];
+    expect(where.listings.some).toEqual({ status: 'ACTIVE', idxDisplayable: true });
+    expect(include.listings.where).toEqual({ status: 'ACTIVE', idxDisplayable: true });
+  });
+
+  it('supports authenticated non-public search without the MLS source exclusion', async () => {
+    await searchPropertiesPg({ publicOnly: false });
+    const { where, include } = mockPrisma.property.findMany.mock.calls[0][0];
+    expect(where.listings.some).toEqual({ status: 'ACTIVE', idxDisplayable: true });
+    expect(include.listings.where).toEqual({ status: 'ACTIVE', idxDisplayable: true });
   });
 
   it('truncates fractional bedrooms rather than throwing', async () => {

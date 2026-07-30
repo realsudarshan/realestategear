@@ -5,24 +5,34 @@ import { cacheSearch } from '../middleware/cache.js';
 import logger from '../utils/logger.js';
 import { searchByBounds } from '../services/searchService.js';
 import { prisma } from 'db';
-import type { ListingStatus, Prisma } from 'db';
-import { generateWebSearchKey, generateAgentSearchKey, reindexAll, toPropertyDoc, toContactDoc, toTransactionDoc, toNoteDoc, toTaskDoc, searchDocuments, isTypesenseConfigured, searchPropertiesPg } from '../search/index.js';
+import { ListingStatus, PropertyType } from 'db';
+import type { Prisma } from 'db';
+import { generateWebSearchKey, generateAgentSearchKey, reconcilePropertyDocument, reindexAll, toPropertyDoc, toContactDoc, toTransactionDoc, toNoteDoc, toTaskDoc, searchDocuments, isTypesenseConfigured, searchPropertiesPg } from '../search/index.js';
 import { buildTypesenseGeoFilter } from '../search/typesenseGeoFilter.js';
 import { authMiddleware, requireRole } from '../middleware/auth.js';
+import { buildPublicListingWhere, buildPublicPropertyTypesenseFilter } from 'search/propertyVisibility';
 
 const router = express.Router();
+
+const typesenseLiteral = Joi.string()
+  .trim()
+  .max(100)
+  .pattern(/^[\p{L}\p{M}\p{N} .'’,\-]+$/u);
+const publicStatuses = Object.values(ListingStatus).map((status) =>
+  status.split('_').map((part) => part.charAt(0) + part.slice(1).toLowerCase()).join(' '),
+);
 
 // Search validation schema
 const searchSchema = Joi.object({
   q: Joi.string().min(1).max(200).optional(),
-  city: Joi.string().optional(),
-  state: Joi.string().optional(),
+  city: typesenseLiteral.optional(),
+  state: typesenseLiteral.optional(),
   minPrice: Joi.number().positive().optional(),
   maxPrice: Joi.number().positive().optional(),
   bedrooms: Joi.number().integer().min(0).optional(),
   bathrooms: Joi.number().positive().optional(),
-  propertyType: Joi.string().optional(),
-  status: Joi.string().optional(),
+  propertyType: typesenseLiteral.valid(...Object.values(PropertyType)).optional(),
+  status: typesenseLiteral.valid(...publicStatuses).optional(),
   minSquareFeet: Joi.number().integer().positive().optional(),
   maxSquareFeet: Joi.number().integer().positive().optional(),
   minYearBuilt: Joi.number().integer().min(1800).max(new Date().getFullYear()).optional(),
@@ -115,7 +125,7 @@ router.get('/', cacheSearch, validateRequest({ query: searchSchema }), async (re
     const runTypesense = () =>
       searchDocuments('properties', {
         q: searchQuery || undefined,
-        filterBy: filterParts.length ? filterParts.join(' && ') : undefined,
+        filterBy: buildPublicPropertyTypesenseFilter(filterParts.join(' && ')),
         sortBy: tsSort,
         page: parseInt(page),
         perPage: parseInt(limit),
@@ -266,7 +276,7 @@ router.get('/suggestions', validateRequest({ query: suggestionsSchema }), async 
         by: ['city', 'state'],
         where: {
           city: { contains: query, mode: 'insensitive' },
-          listings: { some: { status: 'ACTIVE' } },
+          listings: { some: buildPublicListingWhere() },
         },
         _count: { city: true },
         orderBy: { _count: { city: 'desc' } },
@@ -288,7 +298,7 @@ router.get('/suggestions', validateRequest({ query: suggestionsSchema }), async 
       const addresses = await prisma.property.findMany({
         where: {
           address: { contains: query, mode: 'insensitive' },
-          listings: { some: { status: 'ACTIVE' } },
+          listings: { some: buildPublicListingWhere() },
         },
         select: {
           id: true,
@@ -297,7 +307,7 @@ router.get('/suggestions', validateRequest({ query: suggestionsSchema }), async 
           state: true,
           propertyType: true,
           listings: {
-            where: { status: 'ACTIVE' },
+            where: buildPublicListingWhere(),
             orderBy: { listDate: 'desc' },
             take: 1,
             select: { listPrice: true },
@@ -322,7 +332,7 @@ router.get('/suggestions', validateRequest({ query: suggestionsSchema }), async 
     if ((types === 'all' || types === 'types') && suggestions.length < limit) {
       const propertyTypes = await prisma.property.groupBy({
         by: ['propertyType'],
-        where: { listings: { some: { status: 'ACTIVE' } } },
+        where: { listings: { some: buildPublicListingWhere() } },
         _count: { propertyType: true },
         orderBy: { _count: { propertyType: 'desc' } },
         take: Math.min(limit - suggestions.length, 3)
@@ -400,35 +410,45 @@ router.get('/key', authMiddleware, async (req, res, next) => {
   }
 });
 
-// POST /api/admin/search/reindex — full reindex for a collection (admin only)
+// POST /api/search/reindex/:collection - properties are exact; other collections upsert (admin only)
 router.post('/reindex/:collection', authMiddleware, requireRole(['ADMIN']), async (req, res, next) => {
   const { collection } = req.params;
+  const supportedCollections = ['properties', 'contacts', 'transactions', 'notes', 'tasks'] as const;
+
+  if (collection !== 'all' && !supportedCollections.includes(collection as typeof supportedCollections[number])) {
+    return res.status(400).json({ error: `Unknown search collection: ${collection}` });
+  }
 
   try {
+    const counts: Record<string, Awaited<ReturnType<typeof reindexAll>>> = {};
     if (collection === 'properties' || collection === 'all') {
-      await reindexAll('properties', async () => {
+      counts.properties = await reindexAll('properties', async () => {
         const rows = await prisma.property.findMany({
+          where: { listings: { some: buildPublicListingWhere() } },
           include: {
             listings: {
-              where: { status: 'ACTIVE' },
-              orderBy: { listDate: 'desc' },
+              where: buildPublicListingWhere(),
+              orderBy: [{ listDate: 'desc' }, { createdAt: 'desc' }],
               take: 1,
             },
           },
         });
         return rows.map((p) => toPropertyDoc(p, p.listings[0]));
+      }, {
+        exact: true,
+        reconcile: (propertyId) => reconcilePropertyDocument(propertyId),
       });
     }
 
     if (collection === 'contacts' || collection === 'all') {
-      await reindexAll('contacts', async () => {
+      counts.contacts = await reindexAll('contacts', async () => {
         const rows = await prisma.contact.findMany();
         return rows.map(toContactDoc);
       });
     }
 
     if (collection === 'transactions' || collection === 'all') {
-      await reindexAll('transactions', async () => {
+      counts.transactions = await reindexAll('transactions', async () => {
         const rows = await prisma.transaction.findMany({
           include: {
             parties: { include: { contact: { select: { firstName: true, lastName: true } } } },
@@ -439,20 +459,20 @@ router.post('/reindex/:collection', authMiddleware, requireRole(['ADMIN']), asyn
     }
 
     if (collection === 'notes' || collection === 'all') {
-      await reindexAll('notes', async () => {
+      counts.notes = await reindexAll('notes', async () => {
         const rows = await prisma.note.findMany();
         return rows.map(toNoteDoc);
       });
     }
 
     if (collection === 'tasks' || collection === 'all') {
-      await reindexAll('tasks', async () => {
+      counts.tasks = await reindexAll('tasks', async () => {
         const rows = await prisma.task.findMany();
         return rows.map(toTaskDoc);
       });
     }
 
-    res.json({ ok: true, collection });
+    res.json({ ok: true, collection, counts });
   } catch (error) {
     logger.error('Reindex error:', error);
     next(error);

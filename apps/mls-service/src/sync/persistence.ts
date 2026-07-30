@@ -1,6 +1,6 @@
 import { prisma, Prisma, generatePropertySlug, generateUniquePropertySlug } from 'db';
 import { classifyIngestedProperty } from 'db/classification';
-import { upsertDocument, deleteDocument, toPropertyDoc } from 'search';
+import { deleteDocument, isTypesenseConfigured, reconcilePropertyDocument } from 'search';
 import type { ResoPropertyRecord } from '../connectors/reso/types.js';
 import { stripPrefix } from '../connectors/reso/prefix.js';
 import {
@@ -15,8 +15,6 @@ import { str, num, int, dateOf } from './coerce.js';
 import { syncPropertyMedia } from './media.js';
 import { isStorageConfigured } from '../storage/s3.js';
 import logger from '../utils/logger.js';
-
-const PROPERTIES_COLLECTION = 'properties';
 
 export interface MlsPersistenceConfig {
   providerId?: string;
@@ -40,8 +38,35 @@ export interface ProcessResult {
   listingKey: string | null;
   /** Non-fatal media-sync failure (the DB write still committed). */
   mediaFailed?: boolean;
-  /** Non-fatal Typesense upsert/delete failure. */
-  indexFailed?: boolean;
+}
+
+export class SearchIndexReconciliationError extends Error {
+  constructor(listingKey: string, phase: 'pre-delete' | 'post-commit', cause: unknown) {
+    super(`Property search index reconciliation failed during ${phase} [${listingKey}]`, { cause });
+    this.name = 'SearchIndexReconciliationError';
+  }
+}
+
+const propertyReconciliationQueues = new Map<string, Promise<unknown>>();
+
+async function reconcilePropertySearch(
+  propertyId: string,
+  publicDisplayEnabled: boolean | undefined,
+): Promise<void> {
+  const previous = propertyReconciliationQueues.get(propertyId) ?? Promise.resolve();
+  const current = previous
+    .catch(() => undefined)
+    .then(() => reconcilePropertyDocument(propertyId, {
+      MLS_PUBLIC_DISPLAY_ENABLED: publicDisplayEnabled === true ? 'true' : 'false',
+    }));
+  propertyReconciliationQueues.set(propertyId, current);
+  try {
+    await current;
+  } finally {
+    if (propertyReconciliationQueues.get(propertyId) === current) {
+      propertyReconciliationQueues.delete(propertyId);
+    }
+  }
 }
 
 // ── data builders (pure) ─────────────────────────────────────────────────────
@@ -169,6 +194,17 @@ async function upsertPropertyAndListing(
 
   const propertyData = buildPropertyData(record);
   const listingData = buildListingData(record, config);
+  const existingBeforeWrite = await prisma.listing.findUnique({
+    where: { listingKey },
+    select: { propertyId: true },
+  });
+  if (existingBeforeWrite && isTypesenseConfigured()) {
+    try {
+      await deleteDocument('properties', existingBeforeWrite.propertyId);
+    } catch (err) {
+      throw new SearchIndexReconciliationError(listingKey, 'pre-delete', err);
+    }
+  }
 
   const runTransaction = () =>
     prisma.$transaction(async (tx) => {
@@ -241,12 +277,13 @@ async function upsertPropertyAndListing(
     logger.error('[mls] classification failed (DB write committed)', { listingKey, err });
   }
 
-  // Public display gate (D19 + T15 kill-switch): surface a listing publicly (photos +
-  // search index) only when public display is enabled AND the listing isn't IDX-opted-
-  // out. Otherwise it stays in the DB (agent's own records) but is kept out of the index.
-  const publiclyVisible = config.publicDisplayEnabled === true && listing.idxDisplayable;
+  // Public display gate (D19 + T15 kill-switch): only process public media for an
+  // eligible active MLS listing. Reconciliation below independently selects the
+  // newest eligible listing, so a hidden MLS update cannot erase a manual listing.
+  const publiclyVisible = config.publicDisplayEnabled === true
+    && listing.idxDisplayable
+    && listing.status === 'ACTIVE';
   let mediaFailed = false;
-  let indexFailed = false;
   if (publiclyVisible) {
     // Photos: download + re-host after commit (slow, external). Only when storage and
     // a token are configured; a media failure must not roll back the listing. Mutate
@@ -267,32 +304,34 @@ async function upsertPropertyAndListing(
       }
     }
 
-    // Index after commit; a search failure must not roll back good DB data.
-    try {
-      await upsertDocument(PROPERTIES_COLLECTION, toPropertyDoc(property, listing));
-    } catch (err) {
-      indexFailed = true;
-      logger.error('[mls] Typesense upsert failed (DB write committed)', { listingKey, err });
-    }
   } else {
-    // Not publicly visible — ensure it's absent from the public search index.
-    try {
-      await deleteDocument(PROPERTIES_COLLECTION, property.id);
-    } catch (err) {
-      indexFailed = true;
-      logger.error('[mls] Typesense delete (non-displayable) failed', { listingKey, err });
-    }
     logger.info('[mls] listing not publicly indexed', {
       listingKey,
-      reason: config.publicDisplayEnabled !== true ? 'public-display-disabled' : 'idx-opt-out',
+      reason: config.publicDisplayEnabled !== true
+        ? 'public-display-disabled'
+        : !listing.idxDisplayable ? 'idx-opt-out' : 'inactive',
     });
   }
 
-  return { outcome: created ? 'created' : 'updated', listingKey, mediaFailed, indexFailed };
+  // Index after media and all DB updates commit. The effective worker flag is
+  // passed explicitly instead of relying on this process's environment.
+  if (isTypesenseConfigured()) {
+    try {
+      await reconcilePropertySearch(property.id, config.publicDisplayEnabled);
+    } catch (err) {
+      logger.error('[mls] Typesense reconciliation failed (DB write committed)', { listingKey, err });
+      throw new SearchIndexReconciliationError(listingKey, 'post-commit', err);
+    }
+  }
+
+  return { outcome: created ? 'created' : 'updated', listingKey, mediaFailed };
 }
 
 // ── removal (D5: MlgCanView=false) ───────────────────────────────────────────
-async function removeListing(record: ResoPropertyRecord): Promise<ProcessResult> {
+async function removeListing(
+  record: ResoPropertyRecord,
+  config: MlsPersistenceConfig,
+): Promise<ProcessResult> {
   const listingKey = str(record.ListingKey);
   if (!listingKey) return { outcome: 'skipped', listingKey: null };
 
@@ -305,17 +344,21 @@ async function removeListing(record: ResoPropertyRecord): Promise<ProcessResult>
     return { outcome: 'skipped', listingKey };
   }
 
+  if (isTypesenseConfigured()) {
+    try {
+      await deleteDocument('properties', listing.propertyId);
+    } catch (err) {
+      throw new SearchIndexReconciliationError(listingKey, 'pre-delete', err);
+    }
+  }
   await prisma.listing.update({ where: { listingKey }, data: { status: 'WITHDRAWN' } });
 
-  // Drop the property's search doc only if no OTHER active listing keeps it live.
-  const otherActive = await prisma.listing.count({
-    where: { propertyId: listing.propertyId, status: 'ACTIVE', listingKey: { not: listingKey } },
-  });
-  if (otherActive === 0) {
+  if (isTypesenseConfigured()) {
     try {
-      await deleteDocument(PROPERTIES_COLLECTION, listing.propertyId);
+      await reconcilePropertySearch(listing.propertyId, config.publicDisplayEnabled);
     } catch (err) {
-      logger.error('[mls] Typesense delete failed', { listingKey, err });
+      logger.error('[mls] Typesense reconciliation after removal failed', { listingKey, err });
+      throw new SearchIndexReconciliationError(listingKey, 'post-commit', err);
     }
   }
 
@@ -336,7 +379,7 @@ export async function processPropertyRecord(
   // Guard against RESO providers that serialize booleans as strings or numbers (D5/D19).
   const canView = config.viewableFlagField ? (record[config.viewableFlagField] as unknown) : undefined;
   if (canView === false || canView === 'false' || canView === 0) {
-    return removeListing(record);
+    return removeListing(record, config);
   }
   return upsertPropertyAndListing(record, config);
 }

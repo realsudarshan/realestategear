@@ -1,5 +1,6 @@
 import { ListingStatus, Prisma, PropertyType, prisma } from 'db';
 import { toContactDoc, toPropertyDoc, toTaskDoc, toTransactionDoc } from './transformers.js';
+import { buildPublicListingWhere } from './propertyVisibility.js';
 
 // Postgres-native equivalents of the Typesense-backed searches used by
 // apps/api/src/routes/agentSearch.ts (cmd-k palette) and
@@ -158,17 +159,29 @@ export interface PgPropertySearchParams {
   sortOrder?: string;
   page?: number;
   limit?: number;
+  publicOnly?: boolean;
 }
 
 // Which listing represents a property in results, independent of any match
 // filter above: the most recently listed ACTIVE one. Mirrors the convention
 // already baked into apps/api/src/routes/search.ts's reindexAll('properties')
 // handler, which indexes every property via this same fixed selection.
-const REPRESENTATIVE_LISTING = {
-  where: { status: ListingStatus.ACTIVE },
-  orderBy: { listDate: 'desc' as const },
-  take: 1,
-};
+function listingWhere(
+  additional: Prisma.ListingWhereInput | undefined,
+  publicOnly: boolean,
+): Prisma.ListingWhereInput {
+  if (publicOnly) return buildPublicListingWhere(additional);
+  const baseline: Prisma.ListingWhereInput = { status: ListingStatus.ACTIVE, idxDisplayable: true };
+  return additional ? { AND: [baseline, additional] } : baseline;
+}
+
+function representativeListing(publicOnly: boolean) {
+  return {
+    where: listingWhere(undefined, publicOnly),
+    orderBy: { listDate: 'desc' as const },
+    take: 1,
+  };
+}
 
 function buildPropertyOrderBy(
   sortBy?: string,
@@ -215,6 +228,7 @@ export async function searchPropertiesPg(
     sortOrder,
     page = 1,
     limit = 20,
+    publicOnly = true,
   } = params;
   const search = q?.trim();
 
@@ -233,7 +247,7 @@ export async function searchPropertiesPg(
   }
 
   const statusFilter = parseListingStatus(status);
-  const listingWhere: Prisma.ListingWhereInput = {
+  const requestedListingWhere: Prisma.ListingWhereInput = {
     ...(statusFilter ? { status: statusFilter } : {}),
     ...(minPrice != null || maxPrice != null
       ? {
@@ -244,6 +258,10 @@ export async function searchPropertiesPg(
         }
       : {}),
   };
+  const matchedListingWhere = listingWhere(
+    Object.keys(requestedListingWhere).length ? requestedListingWhere : undefined,
+    publicOnly,
+  );
 
   const where: Prisma.PropertyWhereInput = {
     ...(city ? { city: { equals: city, mode: 'insensitive' } } : {}),
@@ -267,7 +285,7 @@ export async function searchPropertiesPg(
           },
         }
       : {}),
-    ...(Object.keys(listingWhere).length > 0 ? { listings: { some: listingWhere } } : {}),
+    listings: { some: matchedListingWhere },
     ...(geoOr.length > 0 ? { OR: geoOr } : {}),
     ...(search
       ? {
@@ -292,7 +310,7 @@ export async function searchPropertiesPg(
       take: limit,
       skip: (page - 1) * limit,
       orderBy: buildPropertyOrderBy(sortBy, sortOrder),
-      include: { listings: REPRESENTATIVE_LISTING },
+      include: { listings: representativeListing(publicOnly) },
     }),
     prisma.property.count({ where }),
   ]);

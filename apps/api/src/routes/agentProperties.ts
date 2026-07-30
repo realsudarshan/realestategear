@@ -10,7 +10,7 @@ router.use(requireRole(['AGENT', 'ADMIN']));
 // Returns { properties, pagination } so callers get capped rows plus a real total count.
 router.get('/', async (req, res, next) => {
   try {
-    const result = await getProperties(req.query);
+    const result = await getProperties(req.query, { publicOnly: false });
     res.json(result);
   } catch (error) {
     next(error);

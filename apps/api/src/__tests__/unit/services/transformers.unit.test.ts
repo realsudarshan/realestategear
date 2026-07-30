@@ -24,6 +24,8 @@ function makeProperty(overrides = {}) {
 function makeListing(overrides = {}) {
   return {
     status: 'ACTIVE',
+    source: 'MLS',
+    idxDisplayable: true,
     listPrice: { toString: () => '425000' },
     ...overrides,
   } as any;
@@ -41,10 +43,18 @@ describe('toPropertyDoc — status + price emission (bug fix)', () => {
     expect(typeof doc.price).toBe('number');
   });
 
+  it('emits listing source and IDX displayability for visibility filtering', () => {
+    const doc = toPropertyDoc(makeProperty(), makeListing());
+    expect(doc.source).toBe('MLS');
+    expect(doc.idxDisplayable).toBe(true);
+  });
+
   it('emits status=undefined and price=undefined when no listing is provided', () => {
     const doc = toPropertyDoc(makeProperty());
     expect(doc.status).toBeUndefined();
     expect(doc.price).toBeUndefined();
+    expect(doc.source).toBeUndefined();
+    expect(doc.idxDisplayable).toBeUndefined();
   });
 
   it('emits status=undefined and price=undefined when listing is null', () => {

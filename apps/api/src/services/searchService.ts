@@ -1,5 +1,6 @@
-import { prisma } from 'db';
+import { ListingStatus, prisma } from 'db';
 import logger from '../utils/logger.js';
+import { buildPublicListingWhere, isMlsPublicDisplayEnabled } from 'search/propertyVisibility';
 
 interface Bounds {
   north: number;
@@ -15,6 +16,14 @@ interface SearchFilters {
   maxPrice?: number | string;
   propertyType?: string;
   status?: string;
+}
+
+function parseListingStatus(value?: string): ListingStatus | undefined {
+  if (!value) return undefined;
+  const candidate = value.toUpperCase().replace(/\s+/g, '_');
+  return (Object.values(ListingStatus) as string[]).includes(candidate)
+    ? candidate as ListingStatus
+    : undefined;
 }
 
 /**
@@ -41,22 +50,62 @@ export async function searchByBounds(
   if (filters.state) propertyWhere.AND.push({ state: { contains: filters.state, mode: 'insensitive' } });
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const listingWhere: any = { property: propertyWhere };
-  if (filters.status) listingWhere.status = filters.status;
-  if (filters.propertyType) listingWhere.property = { ...propertyWhere, propertyType: filters.propertyType };
+  const requestedListingWhere: any = { property: propertyWhere };
+  const requestedStatus = parseListingStatus(filters.status);
+  if (filters.status) requestedListingWhere.status = requestedStatus ?? { in: [] };
+  if (filters.propertyType) requestedListingWhere.property = { ...propertyWhere, propertyType: filters.propertyType };
   if (filters.minPrice || filters.maxPrice) {
     const priceFilter: Record<string, number> = {};
     if (filters.minPrice) priceFilter.gte = parseFloat(String(filters.minPrice));
     if (filters.maxPrice) priceFilter.lte = parseFloat(String(filters.maxPrice));
-    listingWhere.listPrice = priceFilter;
+    requestedListingWhere.listPrice = priceFilter;
   }
+  const listingWhere = buildPublicListingWhere(requestedListingWhere);
 
   try {
     const listings = await prisma.listing.findMany({
       where: listingWhere,
       take: limit,
       orderBy: { listPrice: 'desc' },
-      include: { property: { include: { media: { orderBy: { order: 'asc' } } } } },
+      select: {
+        id: true,
+        propertyId: true,
+        mlsId: true,
+        mlsBoardId: true,
+        slug: true,
+        listPrice: true,
+        status: true,
+        listDate: true,
+        imageUrl: true,
+        description: true,
+        listingAgentName: true,
+        brokerageName: true,
+        brokeragePhone: true,
+        bedrooms: true,
+        bathrooms: true,
+        squareFeet: true,
+        property: {
+          select: {
+            id: true,
+            address: true,
+            city: true,
+            state: true,
+            zipCode: true,
+            latitude: true,
+            longitude: true,
+            propertyType: true,
+            bedrooms: true,
+            bathrooms: true,
+            squareFeet: true,
+            lotSize: true,
+            yearBuilt: true,
+            subdivision: true,
+            ...(isMlsPublicDisplayEnabled()
+              ? { media: { select: { id: true, url: true, caption: true, order: true }, orderBy: { order: 'asc' as const } } }
+              : {}),
+          },
+        },
+      },
     });
 
     return {

@@ -6,6 +6,7 @@ export {
   ensureCollections,
   upsertDocument,
   deleteDocument,
+  reconcilePropertyDocument,
   reindexAll,
   searchDocuments,
   toPropertyDoc,

@@ -38,6 +38,8 @@ export function toPropertyDoc(p: Property, listing?: Listing | null) {
     imageUrl: listing?.imageUrl ?? undefined,
     listingDate: listing?.listDate ? Math.floor(listing.listDate.getTime() / 1000) : undefined,
     status: listing?.status ? normalizeListingStatus(listing.status) : undefined,
+    source: listing?.source ?? undefined,
+    idxDisplayable: listing?.idxDisplayable ?? undefined,
     price: listing?.listPrice != null ? parseFloat(listing.listPrice.toString()) : undefined,
     location:
       p.latitude != null && p.longitude != null

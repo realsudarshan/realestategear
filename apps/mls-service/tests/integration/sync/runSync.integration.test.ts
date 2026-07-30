@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeEach, afterAll, vi } from 'vitest';
 
 vi.mock('search', () => ({
-  upsertDocument: vi.fn(async () => {}),
-  deleteDocument: vi.fn(async () => {}),
-  toPropertyDoc: (p: { id: string }, l: { status?: string } | null) => ({ id: p.id, status: l?.status }),
+  deleteDocument: vi.fn(async () => undefined),
+  isTypesenseConfigured: vi.fn(() => true),
+  reconcilePropertyDocument: vi.fn(async () => 'upserted'),
 }));
 
 import { prisma } from 'db';

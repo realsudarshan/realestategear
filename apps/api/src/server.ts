@@ -57,7 +57,7 @@ import emailRoutes from './routes/email.js';
 import ownerLeadsRoutes from './routes/ownerLeads.js';
 import ownerCollectionsRoutes from './routes/ownerCollections.js';
 import { ensureBootstrapAdmin } from './services/bootstrapAdmin.js';
-import { ensureCollections } from './search/index.js';
+import { ensureCollections, isTypesenseConfigured } from './search/index.js';
 
 import { authMiddleware, requireRole } from './middleware/auth.js';
 import { errorHandler } from './middleware/errorHandler.js';
@@ -210,9 +210,11 @@ export const startServer = async () => {
   validateEnvironment();
 
   // Non-fatal: search degrades gracefully if Typesense is down.
-  ensureCollections().catch(err => {
-    logger.error('Typesense collection bootstrap failed:', err);
-  });
+  if (isTypesenseConfigured()) {
+    ensureCollections().catch(err => {
+      logger.error('Typesense collection bootstrap failed:', err);
+    });
+  }
 
   await ensureBootstrapAdmin();
 

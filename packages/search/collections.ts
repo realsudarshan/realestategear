@@ -21,6 +21,8 @@ export const SCHEMAS = [
       { name: 'propertyType', type: 'string', facet: true, optional: true },
       { name: 'subdivision', type: 'string', facet: true, optional: true },
       { name: 'status', type: 'string', facet: true, optional: true },
+      { name: 'source', type: 'string', facet: true, optional: true },
+      { name: 'idxDisplayable', type: 'bool', facet: true, optional: true },
       { name: 'price', type: 'float', facet: true, optional: true },
       { name: 'bedrooms', type: 'int32', facet: true, optional: true },
       { name: 'bathrooms', type: 'float', facet: true, optional: true },

@@ -7,7 +7,11 @@ import type {
   ResoOfficeRecord,
 } from '../connectors/reso/types.js';
 import { getCursor, updateCursor } from './cursor.js';
-import { processPropertyRecord, type ProcessResult } from './persistence.js';
+import {
+  processPropertyRecord,
+  SearchIndexReconciliationError,
+  type ProcessResult,
+} from './persistence.js';
 import { upsertAgent, upsertOffice } from './roster.js';
 import { str, dateOf } from './coerce.js';
 
@@ -208,9 +212,9 @@ async function processPage(
               break;
           }
           if (result.mediaFailed) m.mediaFailed++;
-          if (result.indexFailed) m.indexFailed++;
         } catch (err) {
-          m.failed++;
+          if (err instanceof SearchIndexReconciliationError) m.indexFailed++;
+          else m.failed++;
           const externalId = externalIdOf(resource, record);
           if (externalId) {
             await recordFailure(config, resource, externalId, record, errMsg(err));

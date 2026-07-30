@@ -1,6 +1,7 @@
 import type { Request, RequestHandler, Response } from 'express';
 import cacheManager from 'cache';
 import logger from '../utils/logger.js';
+import { isMlsPublicDisplayEnabled } from 'search/propertyVisibility';
 
 type CacheKeyGenerator = (req: Request) => string;
 type CacheSkipPredicate = (req: Request, res: Response) => boolean;
@@ -123,7 +124,10 @@ export const cacheSearch = cache({
   ttl: 180, // 3 minutes
   keyGenerator: (req) => {
     const { q: query, ...filters } = req.query;
-    return cacheManager.generateSearchKey(String(query || ''), toRecord(filters));
+    return cacheManager.generateSearchKey(String(query || ''), {
+      ...toRecord(filters),
+      mlsPublicDisplayEnabled: isMlsPublicDisplayEnabled(),
+    });
   }
 });
 
