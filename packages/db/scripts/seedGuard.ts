@@ -5,20 +5,20 @@ export function getDatabaseTarget(databaseUrl: string | undefined): string {
     throw new Error('DATABASE_URL is required before running a demo seed.');
   }
 
-  let url: URL;
+  let parsedUrl: URL;
   try {
-    url = new URL(databaseUrl);
+    parsedUrl = new URL(databaseUrl);
   } catch {
     throw new Error('DATABASE_URL must be a valid URL before running a demo seed.');
   }
 
-  const database = decodeURIComponent(url.pathname.replace(/^\//, ''));
-  if (!url.host || !database) {
+  const databaseName = decodeURIComponent(parsedUrl.pathname.replace(/^\//, ''));
+  if (!parsedUrl.host || !databaseName) {
     throw new Error('DATABASE_URL must identify a database host and name.');
   }
 
-  const schema = url.searchParams.get('schema');
-  return `${url.host}/${database}${schema ? `?schema=${schema}` : ''}`;
+  const schema = parsedUrl.searchParams.get('schema');
+  return `${parsedUrl.host}/${databaseName}${schema ? `?schema=${schema}` : ''}`;
 }
 
 export function requireDemoSeedOptIn(env: NodeJS.ProcessEnv = process.env): string {

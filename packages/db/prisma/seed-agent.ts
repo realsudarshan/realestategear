@@ -1,4 +1,4 @@
-import 'dotenv/config';
+import '../scripts/loadEnv.js';
 import { prisma } from '../index.js';
 import { requireDemoSeedOptIn } from '../scripts/seedGuard.js';
 
@@ -321,18 +321,16 @@ async function main() {
 
   await upsertDemoCollection('Charlotte Active Listings', 'charlotte-active', {});
   await upsertDemoCollection('Dilworth and South End', 'dilworth-south-end', {});
-  await upsertDemoSegment('Luxury Charlotte Homes', {
-    cities: ['Charlotte'],
-    zipCodes: [],
-    subdivisions: [],
-    schoolDistricts: [],
-    propertyTypes: [],
-    styles: [],
-    features: [],
-    priceMin: 1000000,
+  // Was upsertDemoSegment(...) with the pre-collections segment shape, which no
+  // longer exists. collectionPredicateSchema is strict and has no city field —
+  // geography is expressed through areaSlugs or classification tags, and this
+  // seed creates neither. Every seeded property is Charlotte metro anyway, so
+  // the price floor is what actually distinguishes this collection.
+  await upsertDemoCollection('Luxury Charlotte Homes', 'luxury-charlotte', {
+    price: { min: 1_000_000, nulls: 'exclude' },
   });
 
-  console.log('🏘️  Enabled demo MLS access and deployed listing segments');
+  console.log('🏘️  Enabled demo MLS access and deployed listing collections');
 
   // ── Build name pairs ─────────────────────────────────────────────────────────
   // Generate 250 unique first+last combos

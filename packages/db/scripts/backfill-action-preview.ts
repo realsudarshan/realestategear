@@ -2,7 +2,7 @@
  * Backfill previewData for seeded AIAction records that have payload but no previewData.
  * Run once after seeding: npx tsx packages/db/scripts/backfill-action-preview.ts
  */
-import 'dotenv/config';
+import './loadEnv.js';
 import { prisma } from '../index.js';
 
 const RISK_LABELS: Record<string, string> = {

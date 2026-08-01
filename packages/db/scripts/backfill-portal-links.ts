@@ -4,7 +4,7 @@
  * Run after deploying the portal_crm_bridge migration:
  *   node packages/db/scripts/backfill-portal-links.js
  */
-import 'dotenv/config';
+import './loadEnv.js';
 import { prisma } from '../index.js';
 
 async function main() {

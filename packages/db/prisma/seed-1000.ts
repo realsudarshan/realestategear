@@ -1,4 +1,4 @@
-import 'dotenv/config';
+import '../scripts/loadEnv.js';
 import { prisma } from '../index.js';
 import { faker } from '@faker-js/faker';
 import bcrypt from 'bcrypt';
@@ -517,51 +517,39 @@ async function createAgentWorkbenchDemo(tx, accountId: string, userEmail: string
     },
   });
 
-  const segments = await Promise.all([
-    tx.segment.create({
-      data: {
-        accountId,
+  // Segment and PortalSegment were removed when classification replaced
+  // segments; these are now portal-scoped ListingCollections, so the join
+  // table is gone too. collectionPredicateSchema is strict and carries no
+  // city/zip fields — geography comes from areaSlugs or classification tags,
+  // neither of which this seed creates. Every seeded property is Charlotte
+  // metro, so only the price floor survives as a real filter.
+  await tx.listingCollection.createMany({
+    data: [
+      {
+        portalId: portal.id,
+        slug: 'charlotte-active',
         name: 'Charlotte Active Listings',
-        cities: ['Charlotte'],
-        zipCodes: [],
-        subdivisions: [],
-        schoolDistricts: [],
-        propertyTypes: [],
-        styles: [],
-        features: [],
+        predicate: {},
+        isPublished: true,
+        position: 0,
       },
-    }),
-    tx.segment.create({
-      data: {
-        accountId,
+      {
+        portalId: portal.id,
+        slug: 'dilworth-south-end',
         name: 'Dilworth and South End',
-        cities: ['Charlotte'],
-        zipCodes: ['28203'],
-        subdivisions: [],
-        schoolDistricts: [],
-        propertyTypes: [],
-        styles: [],
-        features: [],
+        predicate: {},
+        isPublished: true,
+        position: 1,
       },
-    }),
-    tx.segment.create({
-      data: {
-        accountId,
+      {
+        portalId: portal.id,
+        slug: 'luxury-charlotte',
         name: 'Luxury Charlotte Homes',
-        cities: ['Charlotte'],
-        zipCodes: [],
-        subdivisions: [],
-        schoolDistricts: [],
-        propertyTypes: [],
-        styles: [],
-        features: [],
-        priceMin: 1000000,
+        predicate: { price: { min: 1_000_000, nulls: 'exclude' } },
+        isPublished: true,
+        position: 2,
       },
-    }),
-  ]);
-
-  await tx.portalSegment.createMany({
-    data: segments.map((segment) => ({ portalId: portal.id, segmentId: segment.id })),
+    ],
   });
 }
 
@@ -605,7 +593,7 @@ async function seedData() {
     for (const userData of sampleUsers) {
       await prisma.$transaction(async (tx) => {
         const account = await tx.account.create({
-          data: { name: `${userData.firstName} ${userData.lastName}`, plan: 'free' },
+          data: { name: `${userData.firstName} ${userData.lastName}` },
         });
         const created = await tx.user.create({
           data: { ...userData, accountId: account.id },

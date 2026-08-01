@@ -1,4 +1,4 @@
-import 'dotenv/config';
+import '../scripts/loadEnv.js';
 import { prisma } from '../index.js';
 
 const updates: Record<string, {

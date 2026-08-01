@@ -2,7 +2,7 @@
  * Backfill script to generate SEO-friendly slugs for existing properties
  * Run with: node prisma/backfill-slugs.js
  */
-import 'dotenv/config';
+import '../scripts/loadEnv.js';
 import { prisma } from '../index.js';
 
 /**

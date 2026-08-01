@@ -1,4 +1,4 @@
-import 'dotenv/config';
+import '../scripts/loadEnv.js';
 import { prisma, PropertyType, ListingStatus } from '../index.js';
 import { requireDemoSeedOptIn } from '../scripts/seedGuard.js';
 
