@@ -1,11 +1,10 @@
 {
   "$schema": "https://railway.com/railway.schema.json",
   "build": {
-    "builder": "RAILPACK",
-    "buildCommand": "npm run build --workspace=portal"
+    "builder": "DOCKERFILE",
+    "dockerfilePath": "apps/portal/Dockerfile"
   },
   "deploy": {
-    "startCommand": "npm run start --workspace=portal",
     "watchPaths": [
       "/apps/portal/**",
       "/packages/tokens/**",
