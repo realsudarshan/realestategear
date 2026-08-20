@@ -25,7 +25,7 @@ afterAll(async () => {
   await prisma.$disconnect();
 });
 
-describe('syncPropertyMedia (D7)', () => {
+describe('syncPropertyMedia — authenticated download and rehosting', () => {
   it('downloads each photo (token via User-Agent), stores ordered Media, returns the primary url', async () => {
     const propertyId = await makeProperty();
     const deps = makeDeps();

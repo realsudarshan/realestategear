@@ -48,7 +48,7 @@ async function collect<T>(gen: AsyncGenerator<T[]>): Promise<T[][]> {
 
 const stub = fakeHttp(() => ({ data: {}, status: 200 }));
 
-describe('buildFilter — board scoping + removal-aware incremental (D5)', () => {
+describe('buildFilter — board scoping and removal-aware incremental pulls', () => {
   const c = new ResoWebApiConnector(baseConfig, { httpClient: stub.client });
 
   it('scopes to the board when boardScopeField/Value are configured', () => {
@@ -94,7 +94,7 @@ describe('buildPath — query construction', () => {
     expect(p).toContain('%20'); // spaces in the filter are encoded
   });
 
-  it('adds $expand=Media only when requested (D7)', () => {
+  it('adds $expand=Media only when requested for photo rehosting', () => {
     expect(c.buildPath('Property', { expandMedia: true })).toContain('$expand=Media');
     expect(c.buildPath('Property')).not.toContain('$expand');
   });
@@ -115,7 +115,7 @@ describe('buildPath — query construction', () => {
   });
 });
 
-describe('fetchResource — @odata.nextLink pagination (D3) / streaming (D15)', () => {
+describe('fetchResource — streamed @odata.nextLink pagination', () => {
   it('follows nextLink until absent, yielding one page at a time', async () => {
     const nextUrl = 'https://api.mlsgrid.com/v2/Property?$skiptoken=abc';
     const http = fakeHttp((_url, n) =>
@@ -164,7 +164,7 @@ describe('fetchResource — @odata.nextLink pagination (D3) / streaming (D15)', 
   });
 });
 
-describe('executeWithRetry — backoff on transient errors (D2)', () => {
+describe('executeWithRetry — backoff on transient errors only', () => {
   it('retries a 5xx then succeeds', async () => {
     let n = 0;
     const client: HttpClient = {

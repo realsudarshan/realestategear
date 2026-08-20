@@ -5,13 +5,14 @@ import * as SeparatorPrimitive from "@radix-ui/react-separator"
 
 import { cn } from "@realestategear/tokens"
 
-const Separator = React.forwardRef<
-  React.ElementRef<typeof SeparatorPrimitive.Root>,
-  React.ComponentProps<typeof SeparatorPrimitive.Root>
->(({ className, orientation = "horizontal", decorative = true, ...props }, ref) => {
+function Separator({
+  className,
+  orientation = "horizontal",
+  decorative = true,
+  ...props
+}: React.ComponentProps<typeof SeparatorPrimitive.Root>) {
   return (
     <SeparatorPrimitive.Root
-      ref={ref}
       data-slot="separator"
       decorative={decorative}
       orientation={orientation}
@@ -22,7 +23,6 @@ const Separator = React.forwardRef<
       {...props}
     />
   )
-})
-Separator.displayName = "Separator"
+}
 
 export { Separator }

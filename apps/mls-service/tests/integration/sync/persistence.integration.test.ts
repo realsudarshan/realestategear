@@ -55,7 +55,7 @@ afterAll(async () => {
   await prisma.$disconnect();
 });
 
-describe('processPropertyRecord — upsert (D11/D12/D17)', () => {
+describe('processPropertyRecord — transactional upsert and display ID handling', () => {
   it('creates a Property + Listing and indexes it', async () => {
     const rec = makeRecord({ ListingKey: 'CANOPYKEY_A', ListingId: 'CANOPY12345' });
     const result = await processPropertyRecord(rec, config);
@@ -68,7 +68,7 @@ describe('processPropertyRecord — upsert (D11/D12/D17)', () => {
     expect(listing!.mlsBoardId).toBe('CanopyMLS');
     expect(listing!.status).toBe('ACTIVE');
     expect(listing!.slug).toBeTruthy();
-    // D17: listingKey stored prefixed; mlsId stored de-prefixed for display.
+    // The canonical listingKey stays prefixed; the display mlsId is de-prefixed.
     expect(listing!.listingKey).toBe('CANOPYKEY_A');
     expect(listing!.mlsId).toBe('12345');
 
@@ -98,7 +98,7 @@ describe('processPropertyRecord — upsert (D11/D12/D17)', () => {
     expect(Number(listing?.listPrice)).toBe(400000);
   });
 
-  it('a relisting (same parcel, new ListingKey) reuses one Property (D11)', async () => {
+  it('a relisting with the same parcel and a new ListingKey reuses one Property', async () => {
     const parcel = 'PARCEL_SHARED';
     await processPropertyRecord(makeRecord({ ListingKey: 'KEY_OLD', ParcelNumber: parcel }), config);
     await processPropertyRecord(makeRecord({ ListingKey: 'KEY_NEW', ParcelNumber: parcel }), config);
@@ -112,7 +112,7 @@ describe('processPropertyRecord — upsert (D11/D12/D17)', () => {
     expect(new Set(listings.map((l) => l.propertyId)).size).toBe(1);
   });
 
-  it('multi-unit records sharing a parcel do NOT collapse into one Property (Codex #11)', async () => {
+  it('multi-unit records sharing a parcel do NOT collapse into one Property', async () => {
     const parcel = 'PARCEL_CONDO';
     await processPropertyRecord(
       makeRecord({ ListingKey: 'UNIT_1', ParcelNumber: parcel, UnitNumber: '101' }),
@@ -157,7 +157,7 @@ describe('processPropertyRecord — upsert (D11/D12/D17)', () => {
   });
 });
 
-describe('processPropertyRecord — status mapping (D10)', () => {
+describe('processPropertyRecord — fail-safe status mapping', () => {
   it('an unknown StandardStatus is persisted but never ACTIVE', async () => {
     const rec = makeRecord({ ListingKey: 'KEY_WEIRD', StandardStatus: 'Some New Status' });
     await processPropertyRecord(rec, config);
@@ -168,7 +168,7 @@ describe('processPropertyRecord — status mapping (D10)', () => {
   });
 });
 
-describe('processPropertyRecord — removal (D5)', () => {
+describe('processPropertyRecord — configured viewable-flag removal', () => {
   it('MlgCanView=false marks the listing WITHDRAWN and removes its search doc', async () => {
     const rec = makeRecord({ ListingKey: 'KEY_GONE' });
     await processPropertyRecord(rec, config); // create (active)
@@ -207,7 +207,7 @@ describe('processPropertyRecord — removal (D5)', () => {
   });
 });
 
-describe('processPropertyRecord — IDX display compliance (D19)', () => {
+describe('processPropertyRecord — IDX internet-display compliance', () => {
   it('a listing opted out of internet display is stored but kept out of the public index', async () => {
     await processPropertyRecord(
       makeRecord({ ListingKey: 'KEY_HIDDEN', InternetEntireListingDisplayYN: false }),
@@ -228,7 +228,7 @@ describe('processPropertyRecord — IDX display compliance (D19)', () => {
     expect(vi.mocked(reconcilePropertyDocument)).toHaveBeenCalledOnce();
   });
 
-  it('public-display kill-switch off: a displayable listing is stored but NOT indexed (T15)', async () => {
+  it('public-display kill switch off: a displayable listing is stored but NOT indexed', async () => {
     await processPropertyRecord(makeRecord({ ListingKey: 'KEY_GATED' }), {
       ...config,
       publicDisplayEnabled: false,

@@ -27,7 +27,7 @@ function httpStatus(err: unknown): number | undefined {
  * specific to any one vendor: auth (static bearer vs. OAuth2 client-
  * credentials), base URL, board-scope filter, and viewable-flag field are all
  * injected as config. OData query building, `@odata.nextLink` pagination
- * streamed page-by-page (D3/D15), exponential-backoff retry, and a request
+ * streamed page-by-page for bounded memory, exponential-backoff retry, and a request
  * throttle are the parts that are genuinely standard across vendors.
  */
 export class ResoWebApiConnector {
@@ -81,7 +81,7 @@ export class ResoWebApiConnector {
    * a single-board Trestle/Bridge/Spark license). Adds the incremental
    * watermark when `since` is set, and the viewable-flag clause ONLY for full
    * imports (`requireViewable`) — incremental must see the flag flip to
-   * detect removals (D5) — and only when `viewableFlagField` is configured.
+   * detect removals — and only when `viewableFlagField` is configured.
    */
   buildFilter(_resource: ResoResource, opts: FetchOptions = {}): string {
     const parts: string[] = [];
@@ -96,7 +96,7 @@ export class ResoWebApiConnector {
   }
 
   /** Initial request path. `$orderby=ModificationTimestamp` keeps paging stable so
-   *  page boundaries don't shift mid-sync (Codex #7); nextLink carries it forward.
+   *  page boundaries don't shift mid-sync; `@odata.nextLink` carries it forward.
    *  Omits `$filter=` entirely when there's nothing to filter on (e.g. a vendor
    *  with no board-scope field and no viewable flag, on a full sync with no
    *  watermark) — an empty `$filter=` param is invalid OData. */
@@ -111,8 +111,8 @@ export class ResoWebApiConnector {
   /**
    * Stream a resource's records page-by-page. Yields one page (array) at a time
    * by following `@odata.nextLink` until it is absent — bounded memory regardless
-   * of board size (D15). The caller advances its watermark from the records it
-   * receives (D4); this connector does not track cursors.
+   * of board size. The caller advances its watermark from the records it
+   * receives; this connector does not track cursors.
    */
   async *fetchResource<T>(resource: ResoResource, opts: FetchOptions = {}): AsyncGenerator<T[]> {
     let url: string | null = this.buildPath(resource, opts);
@@ -139,7 +139,7 @@ export class ResoWebApiConnector {
     return this.http.get<T>(url, headers);
   }
 
-  /** Exponential backoff. Retries network/5xx errors; never retries 4xx (D2). */
+  /** Exponential backoff for transient network/5xx errors; never retries 4xx. */
   private async executeWithRetry<T>(operation: () => Promise<T>): Promise<T> {
     let lastError: unknown;
     for (let attempt = 1; attempt <= this.maxRetries; attempt++) {

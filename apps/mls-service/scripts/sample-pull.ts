@@ -2,10 +2,10 @@
  * One-shot diagnostic: pull a small sample of Property records from your
  * configured RESO Web API vendor (MLS Grid, Trestle, Bridge, Spark, etc.) and
  * report the things a self-hoster needs to confirm before syncing for real:
- *   - the board PREFIX on ListingKey / ListingId / parcel (decision D17)
- *   - ParcelNumber fill rate (decision D11 — parcel-anchor vs listing fallback)
- *   - distinct StandardStatus values (decision D10 — status map coverage)
- *   - UnitNumber presence (Codex #11 — multi-unit guard relevance)
+ *   - the board prefix on ListingKey and ListingId
+ *   - ParcelNumber fill rate for parcel-based property identity
+ *   - distinct StandardStatus values for status-map coverage
+ *   - UnitNumber presence to assess the multi-unit identity guard
  *
  * Read-only. No DB writes. Requires MLS_AUTH_TYPE + the matching credentials
  * (see docs/MLS_BOARD_SETUP.md).
@@ -45,15 +45,15 @@ function report(records: ResoPropertyRecord[]): void {
   const statuses = [...new Set(records.map((r) => str(r.StandardStatus)).filter(Boolean))].sort();
 
   console.log(`\n=== MLS sample report (${n} Property records) ===\n`);
-  console.log('PREFIX (D17):');
+  console.log('BOARD ID PREFIXES:');
   console.log(`  ListingKey prefix guess : ${guessPrefix(listingKeys)}`);
   console.log(`  ListingId  prefix guess : ${guessPrefix(listingIds)}`);
   console.log(`  sample ListingKey       : ${listingKeys.slice(0, 3).join(', ') || '(none)'}`);
   console.log(`  sample ListingId        : ${listingIds.slice(0, 3).join(', ') || '(none)'}`);
-  console.log('\nPARCEL (D11):');
+  console.log('\nPROPERTY IDENTITY FIELDS:');
   console.log(`  ParcelNumber present    : ${withParcel}/${n} (${pct(withParcel, n)})`);
   console.log(`  UnitNumber present      : ${withUnit}/${n} (${pct(withUnit, n)})  [multi-unit guard]`);
-  console.log('\nSTATUS (D10):');
+  console.log('\nSTATUS MAP COVERAGE:');
   console.log(`  distinct StandardStatus : ${statuses.join(', ') || '(none)'}`);
   console.log('\nFIELDS on first record:');
   console.log(`  ${Object.keys(records[0] ?? {}).sort().join(', ')}`);

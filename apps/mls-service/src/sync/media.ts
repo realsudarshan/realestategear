@@ -5,7 +5,7 @@ import { str, int, dateOf } from './coerce.js';
 import { putObject as s3PutObject } from '../storage/s3.js';
 
 /**
- * Media (photo) sync for a Property record (decision D7 / Codex #9).
+ * Authenticated media download and rehosting for a Property record.
  *
  * MLS Grid FORBIDS hotlinking MediaURL — each image must be downloaded with the
  * OAuth token in the `User-Agent` header and re-hosted. We download to S3, replace
@@ -80,7 +80,7 @@ export async function syncPropertyMedia(
 ): Promise<MediaResult> {
   const photosChangedAt = dateOf(record.PhotosChangeTimestamp);
 
-  // Skip unchanged photos (D7 / Codex #9): only re-pull when the source photo
+  // Skip unchanged photos: only re-pull when the source photo
   // timestamp advanced past what we last ingested.
   const property = await prisma.property.findUnique({
     where: { id: propertyId },
@@ -98,7 +98,7 @@ export async function syncPropertyMedia(
 
   if (ordered.length === 0) return { imageUrl: null, changed: false };
 
-  // Download + re-host with bounded concurrency (media fetches hit MLS Grid — D15).
+  // Download and rehost with bounded concurrency to limit load on the MLS provider.
   const concurrency = config.concurrency ?? 4;
   const uploaded: { url: string; order: number; caption: string | null }[] = [];
   for (let i = 0; i < ordered.length; i += concurrency) {

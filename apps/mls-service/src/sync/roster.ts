@@ -4,9 +4,9 @@ import type { ResoMemberRecord, ResoOfficeRecord } from '../connectors/reso/type
 import { str, dateOf } from './coerce.js';
 
 /**
- * MLS member/office roster upserts (decision D8, write side). Verification reads
+ * MLS member/office roster upserts. Agent verification reads
  * MlsAgent.mlsId at onboarding — stored de-prefixed since agents type the
- * un-prefixed id (D17). Keyed on (providerId, externalId) = the immutable Key.
+ * un-prefixed ID. Rows are keyed on (providerId, externalId), using the immutable Key.
  */
 
 export interface RosterConfig {

@@ -2,11 +2,11 @@ import { prisma } from 'db';
 
 /**
  * Incremental watermark per (provider, resource). `lastSyncAt` stores the greatest
- * ModificationTimestamp actually seen (server clock), not the client clock (D4).
+ * ModificationTimestamp actually seen from the server, not the client clock.
  *
  * On read we subtract a small overlap so the next run re-fetches the boundary
  * window. That closes the tie bug (records sharing the exact max timestamp that
- * arrive just after we recorded it would otherwise be skipped by `gt` — Codex #1);
+ * arrive just after we recorded it would otherwise be skipped by `gt`);
  * re-processing the overlap is harmless because the upsert is idempotent.
  */
 const OVERLAP_MS = 60_000;

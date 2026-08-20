@@ -15,7 +15,7 @@ import type { AuthStrategy } from './auth/types.js';
 
 export type ResoResource = 'Property' | 'Member' | 'Office';
 
-/** OData collection response envelope. `@odata.nextLink` drives pagination (D3). */
+/** OData collection response envelope. `@odata.nextLink` drives pagination. */
 export interface ODataResponse<T> {
   value: T[];
   '@odata.nextLink'?: string;
@@ -50,7 +50,7 @@ export interface ResoConnectorConfig {
    * on StandardStatus.
    */
   viewableFlagField?: string;
-  /** Board prefix on Key/MlsId values, e.g. "ACT" for ACTRIS via MLS Grid (D17). */
+  /** Board prefix on Key/MlsId values, e.g. "ACT" for ACTRIS via MLS Grid. */
   prefix?: string;
   pageSize?: number;
   timeoutMs?: number;
@@ -63,9 +63,9 @@ export interface ResoConnectorConfig {
 export interface FetchOptions {
   /** Incremental watermark: only records with ModificationTimestamp gt `since`. */
   since?: Date;
-  /** Inject the viewable-flag filter — full import only. Incremental must NOT set this (D5). */
+  /** Inject the viewable-flag filter for full imports only; incremental pulls must observe removals. */
   requireViewable?: boolean;
-  /** `$expand=Media` to pull photo records (Property; D7). */
+  /** `$expand=Media` to pull Property photo records for authenticated rehosting. */
   expandMedia?: boolean;
 }
 
@@ -76,7 +76,7 @@ export interface ResoRecord {
 }
 
 export interface ResoPropertyRecord extends ResoRecord {
-  /** Immutable RESO primary key (prefixed) — the upsert anchor (D17). */
+  /** Immutable, prefixed RESO primary key used as the upsert anchor. */
   ListingKey: string;
   /** Human MLS number (prefixed) — display/search only. */
   ListingId?: string;

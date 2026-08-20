@@ -3,16 +3,16 @@ import { getAccountEmailTarget, sendInternalMlsStatusFlaggedAlert } from './life
 import logger from '../utils/logger.js';
 
 /**
- * Agent onboarding MLS verification (decision D8, read side).
+ * Agent onboarding verification against the synchronized MLS roster.
  *
  * Matches a submitted MLS id against the roster (MlsAgent) that apps/mls-service
  * syncs, and on success records the membership in AccountMlsAccess. The roster
- * stores mlsId de-prefixed (D17); this strips the same prefix from the submitted
+ * stores mlsId de-prefixed; this strips the same prefix from the submitted
  * value before matching, so onboarding works for boards that prefix IDs (e.g.
  * ACTRIS's "ACT" via MLS Grid), not just unprefixed boards like Canopy.
  *
  * MVP scope: the live single-id fallback for a brand-new agent not yet in the
- * daily roster (D8) is intentionally NOT built — a same-day-licensed agent signing
+ * daily roster is intentionally NOT built — a same-day-licensed agent signing
  * up is an edge case not worth the live-connector plumbing for MVP. A roster
  * miss returns 'not_found'; the agent verifies after the next daily roster sync.
  * Tracked in TODOS.md.
@@ -31,7 +31,7 @@ export interface MlsVerificationConfig {
   providerId: string;
   /** Board key stored on AccountMlsAccess.mlsBoardId — must match Listing.mlsBoardId. */
   mlsBoardId: string;
-  /** Vendor board prefix (D17) — must match mls-service's MLS_PREFIX. */
+  /** Vendor board prefix used for IDs; must match mls-service's MLS_PREFIX. */
   prefix?: string;
 }
 

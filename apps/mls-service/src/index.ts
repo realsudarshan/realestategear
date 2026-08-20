@@ -39,7 +39,7 @@ function scheduleSync(connector: SyncConnector, config: SyncConfig): void {
   // Property: incremental every 10 minutes, full reconcile nightly at 2am.
   tasks.push(cron.schedule('*/10 * * * *', () => void run('Property', false)));
   tasks.push(cron.schedule('0 2 * * *', () => void run('Property', true)));
-  // Member/Office roster: slow-changing, daily at 3am (decision D8).
+  // Member/Office roster: slow-changing verification data, refreshed daily at 3am.
   tasks.push(
     cron.schedule('0 3 * * *', async () => {
       await run('Member', false);

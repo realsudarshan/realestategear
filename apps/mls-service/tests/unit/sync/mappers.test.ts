@@ -8,7 +8,7 @@ import {
   isIdxDisplayable,
 } from '../../../src/sync/mappers.js';
 
-describe('normalizeStatus (D10) — fail-safe RESO → ListingStatus', () => {
+describe('normalizeStatus — fail-safe RESO → ListingStatus mapping', () => {
   const known: Array<[string, string]> = [
     ['Active', 'ACTIVE'],
     ['Active Under Contract', 'PENDING'],
@@ -43,7 +43,7 @@ describe('normalizeStatus (D10) — fail-safe RESO → ListingStatus', () => {
   });
 });
 
-describe('normalizePropertyType (D10)', () => {
+describe('normalizePropertyType — known RESO property types', () => {
   it('maps known RESO sub-types', () => {
     expect(normalizePropertyType('Single Family Residence')).toBe('SINGLE_FAMILY');
     expect(normalizePropertyType('Condominium')).toBe('CONDO');
@@ -78,7 +78,7 @@ describe('normalizeSubdivision (TODO-2) — collapse dirty variants', () => {
   });
 });
 
-describe('assembleAddress (Codex #10)', () => {
+describe('assembleAddress — authoritative unparsed address with component fallback', () => {
   it('prefers UnparsedAddress, collapsing whitespace (real RESO field)', () => {
     expect(assembleAddress({ UnparsedAddress: '1506  Timber St  ', StreetName: 'ignored' })).toBe(
       '1506 Timber St',
@@ -120,7 +120,7 @@ describe('toRawData', () => {
   });
 });
 
-describe('isIdxDisplayable (D19)', () => {
+describe('isIdxDisplayable — internet-display opt-out', () => {
   it('blocks only on an explicit opt-out', () => {
     expect(isIdxDisplayable({ InternetEntireListingDisplayYN: false })).toBe(false);
   });

@@ -362,8 +362,8 @@ model Property {
   subdivision String?
   normalizedAttributes Json @default("{}")
 
-  // MLS Grid PhotosChangeTimestamp last ingested — lets the media sync skip
-  // re-downloading photos that haven't changed (decision D7 / Codex #9).
+  // MLS Grid PhotosChangeTimestamp last ingested — lets authenticated media
+  // rehosting skip photos that have not changed.
   photosSyncedAt DateTime?
 
   listings     Listing[]
@@ -460,7 +460,7 @@ model Listing {
 
   mlsBoardId String?
   mlsId      String? // public-facing RESO ListingId (de-prefixed) — display/search only, NOT the upsert key
-  listingKey String? @unique // immutable RESO ListingKey (stored prefixed) — the MLS-record upsert anchor (decision D17)
+  listingKey String? @unique // immutable, prefixed RESO ListingKey used as the MLS-record upsert anchor
   slug       String? @unique
 
   listPrice Decimal?
@@ -468,7 +468,7 @@ model Listing {
   listDate  DateTime?
   closeDate DateTime?
 
-  // IDX/VOW compliance (Lane F / D19): false when the MLS forbids public internet
+  // IDX/VOW internet-display compliance: false when the MLS forbids public internet
   // display (e.g. RESO InternetEntireListingDisplayYN=false). Non-displayable
   // listings are kept for the agent's own records but excluded from the public
   // search index and portal feeds.
@@ -496,7 +496,7 @@ model Listing {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  // Relaxed from @@unique to @@index (decision D17): mlsId (RESO ListingId) is a
+  // Relaxed from @@unique to @@index: mlsId (RESO ListingId) is a
   // de-prefixed display value and is not guaranteed unique; listingKey is the unique anchor.
   @@index([mlsBoardId, mlsId])
   @@index([status])
@@ -1560,7 +1560,7 @@ model InquiryDelivery {
 // ─────────────────────────────────────────────────────────────────────────────
 
 /// Per-resource incremental watermark. `lastSyncAt` holds the greatest
-/// ModificationTimestamp seen for the resource (decision D4) — the server's clock,
+/// ModificationTimestamp observed for the resource using the server's clock,
 /// not the client's — so incremental pulls never skip records on clock skew.
 model SyncCursor {
   id         String   @id @default(cuid())
@@ -1573,7 +1573,7 @@ model SyncCursor {
 }
 
 /// MLS member roster, synced from MLS Grid's Member resource. Backs agent
-/// onboarding verification (decision D8): a submitted MLS ID is matched here, and
+/// onboarding verification: a submitted MLS ID is matched here, and
 /// on success an AccountMlsAccess row is written.
 model MlsAgent {
   id           String    @id @default(cuid())
@@ -1618,7 +1618,7 @@ model MlsOffice {
   @@index([mlsId])
 }
 
-/// Dead-letter capture for records that failed to process (decision D13). The
+/// Dead-letter capture for records that failed to process. The
 /// sync retries these with backoff so one poison record can't wedge or silently
 /// drop the batch; the watermark still advances on the successful records.
 model MlsSyncFailure {

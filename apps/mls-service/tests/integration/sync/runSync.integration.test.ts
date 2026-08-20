@@ -55,7 +55,7 @@ afterAll(async () => {
   await prisma.$disconnect();
 });
 
-describe('runSync — streaming + watermark (D4/D15)', () => {
+describe('runSync — page streaming with a server-observed watermark', () => {
   it('processes every page and advances the cursor to the max ModificationTimestamp', async () => {
     const a = propRecord({ ListingKey: 'KA', ModificationTimestamp: '2026-06-01T00:00:00.000Z' });
     const b = propRecord({ ListingKey: 'KB', ModificationTimestamp: '2026-06-03T00:00:00.000Z' }); // latest
@@ -101,7 +101,7 @@ describe('runSync — slug-conflict retry under full-chunk contention', () => {
   });
 });
 
-describe('runSync — dead-letter capture + retry (D13)', () => {
+describe('runSync — dead-letter capture and recovery', () => {
   it('captures a failing record, keeps the batch going, and recovers it on retry', async () => {
     // Two records with the SAME listingKey in one page race to create it; the
     // unique constraint guarantees exactly one fails → dead-lettered.
@@ -121,7 +121,7 @@ describe('runSync — dead-letter capture + retry (D13)', () => {
   });
 });
 
-describe('runSync — removal via MlgCanView (D5)', () => {
+describe('runSync — removal via the configured viewable flag', () => {
   it('a later page with MlgCanView=false withdraws the listing', async () => {
     const rec = propRecord({ ListingKey: 'KGONE' });
     await runSync('Property', {}, config, { connector: connectorFor({ Property: [[rec]] }) });
@@ -135,7 +135,7 @@ describe('runSync — removal via MlgCanView (D5)', () => {
   });
 });
 
-describe('runSync — overlap guard (D18)', () => {
+describe('runSync — same-resource overlap guard', () => {
   it('skips a second run already in progress for the same resource', async () => {
     const connector = connectorFor({ Property: [[propRecord()]] });
     const [first, second] = await Promise.all([
@@ -147,7 +147,7 @@ describe('runSync — overlap guard (D18)', () => {
   });
 });
 
-describe('runSync — kill-switch (T15)', () => {
+describe('runSync — operational sync kill switch', () => {
   it('skips entirely (processes nothing) when MLS_SYNC_ENABLED=false', async () => {
     process.env.MLS_SYNC_ENABLED = 'false';
     try {
@@ -163,7 +163,7 @@ describe('runSync — kill-switch (T15)', () => {
   });
 });
 
-describe('runSync — metrics breakdown (T14)', () => {
+describe('runSync — per-run metrics breakdown', () => {
   it('counts created / updated / skipped records per run', async () => {
     // seed one listing
     await runSync('Property', {}, config, {

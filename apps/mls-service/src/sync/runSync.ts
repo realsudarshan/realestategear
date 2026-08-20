@@ -22,9 +22,9 @@ const MAX_DEAD_LETTER_BATCH = 500;
 export interface SyncConfig {
   providerId: string; // e.g. 'mls' — keys cursor / roster / dead-letter
   mlsBoardId: string; // compliance/DB board identity, stored on Listing.mlsBoardId
-  prefix?: string; // vendor board prefix (D17), e.g. MLS Grid's "ACT" for ACTRIS
-  accessToken?: string; // static bearer token — enables photo download in the persistence layer (D7); unset for OAuth2 vendors
-  publicDisplayEnabled?: boolean; // compliance kill-switch — gate public indexing (T15/D19)
+  prefix?: string; // vendor board prefix, e.g. MLS Grid's "ACT" for ACTRIS
+  accessToken?: string; // static bearer token for media downloads; unset for OAuth2 vendors
+  publicDisplayEnabled?: boolean; // fail-closed compliance kill switch for public indexing
   viewableFlagField?: string; // vendor's "viewable"/delete flag, e.g. MLS Grid's "MlgCanView"
 }
 
@@ -35,7 +35,7 @@ export interface SyncConnector {
   ): AsyncGenerator<T[]>;
 }
 
-/** Per-run, per-resource metrics (T14). `skipped` flags a run skipped by the
+/** Per-run, per-resource metrics. `skipped` flags a run skipped by the
  *  kill-switch/overlap lock; record-level skips are counted in `skippedRecords`. */
 export interface SyncMetrics {
   resource: ResoResource;
@@ -78,7 +78,7 @@ type AnyRecord = Record<string, unknown> & { ModificationTimestamp?: unknown };
 
 // In-process guard: node-cron fires on schedule regardless of whether the prior
 // run finished, so a slow run could overlap the next tick and race the cursor
-// (decision D18). This prevents that. NOTE: single-process only — a multi-instance
+// when the previous run is still active. This prevents that. NOTE: single-process only — a multi-instance
 // deployment would additionally need a DB-level lock (flagged follow-up).
 const running = new Set<string>();
 
@@ -121,7 +121,7 @@ function errMsg(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
 }
 
-// ── dead-letter (decision D13) ───────────────────────────────────────────────
+// ── dead-letter capture and recovery ─────────────────────────────────────────
 async function recordFailure(
   config: SyncConfig,
   resource: ResoResource,
@@ -149,7 +149,7 @@ async function clearFailure(config: SyncConfig, resource: ResoResource, external
   });
 }
 
-/** Re-process previously dead-lettered records, up to MAX_RETRIES each (D13). */
+/** Re-process previously dead-lettered records, up to MAX_RETRIES each. */
 export async function retryFailures(
   resource: ResoResource,
   config: SyncConfig,
@@ -181,7 +181,7 @@ export async function retryFailures(
   return { retried: pending.length, recovered };
 }
 
-// ── page processing (bounded concurrency, D15) ───────────────────────────────
+// ── page processing with bounded concurrency ─────────────────────────────────
 async function processPage(
   page: AnyRecord[],
   resource: ResoResource,
@@ -234,7 +234,8 @@ async function processPage(
  * Sync one resource end to end: retry the dead-letter, then stream pages from the
  * connector (incremental from the watermark, or a full pull), process each page
  * with bounded concurrency, capture failures, and advance the watermark to the
- * greatest ModificationTimestamp seen (D4). Guarded against overlapping runs (D18).
+ * greatest ModificationTimestamp observed from the server. Concurrent runs of the
+ * same provider and resource are prevented from overlapping.
  */
 export async function runSync(
   resource: ResoResource,
@@ -242,7 +243,7 @@ export async function runSync(
   config: SyncConfig,
   deps: { connector: SyncConnector },
 ): Promise<SyncMetrics> {
-  // Kill-switch (T15): stop the sync without a redeploy.
+  // Operational kill switch: stop the sync without a redeploy.
   if (process.env.MLS_SYNC_ENABLED === 'false') {
     logger.warn(`[mls] ${resource} sync disabled (MLS_SYNC_ENABLED=false) — skipping`);
     return { ...emptyMetrics(resource), skipped: true };
@@ -281,7 +282,7 @@ export async function runSync(
 
     if (maxTs) await updateCursor(config.providerId, resource, maxTs);
 
-    // Metrics (T14): one structured line per run + loud alerts on errors.
+    // Emit one structured metrics line per run and loud alerts on errors.
     logger.info('[mls] sync metrics', { ...m, fullSync: !!opts.fullSync });
     if (m.failed + m.mediaFailed + m.indexFailed > 0) {
       logger.warn('[mls] sync completed with errors', {

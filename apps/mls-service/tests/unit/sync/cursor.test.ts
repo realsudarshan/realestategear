@@ -21,7 +21,7 @@ describe('getCursor', () => {
     expect(await getCursor('mlsgrid', 'Property')).toBeUndefined();
   });
 
-  it('returns lastSyncAt minus OVERLAP_MS to close the tie-bug window (Codex #1)', async () => {
+  it('returns lastSyncAt minus OVERLAP_MS to close the timestamp tie window', async () => {
     const stored = new Date('2026-06-01T12:00:00.000Z');
     mockPrisma.syncCursor.findUnique.mockResolvedValue({ lastSyncAt: stored });
     const result = await getCursor('mlsgrid', 'Property');

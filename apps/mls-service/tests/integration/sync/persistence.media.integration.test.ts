@@ -49,7 +49,7 @@ afterAll(async () => {
   await prisma.$disconnect();
 });
 
-describe('processPropertyRecord media wiring (D7)', () => {
+describe('processPropertyRecord — public media sync wiring', () => {
   it('runs media when token+storage are configured, persists imageUrl, and indexes it', async () => {
     await processPropertyRecord(record, config);
 

@@ -20,7 +20,7 @@ const { verifyAndLinkMlsAccess, checkMlsStatuses } = await import('../../../serv
 
 const config = { providerId: 'mlsgrid', mlsBoardId: 'CanopyMLS' };
 
-describe('verifyAndLinkMlsAccess (D8)', () => {
+describe('verifyAndLinkMlsAccess — synchronized roster verification', () => {
   beforeEach(() => vi.clearAllMocks());
 
   it('rejects an empty / whitespace MLS id without querying', async () => {

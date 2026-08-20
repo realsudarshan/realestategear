@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { stripPrefix, addPrefix } from '../../../../src/connectors/reso/prefix.js';
 
-describe('board ID prefix helpers (D17)', () => {
+describe('board ID prefix helpers for canonical and display IDs', () => {
   it('stripPrefix removes a leading board prefix', () => {
     expect(stripPrefix('ACT123456', 'ACT')).toBe('123456');
   });

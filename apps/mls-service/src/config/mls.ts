@@ -40,8 +40,8 @@ function buildOAuth2Auth(env: NodeJS.ProcessEnv): OAuth2ClientCredentialsAuth {
 }
 
 /**
- * Typed RESO Web API configuration from the environment (decision D9 — no
- * JSON config file). Returns null when MLS_AUTH_TYPE is unset so the service
+ * Typed RESO Web API configuration from environment variables rather than a
+ * JSON config file. Returns null when MLS_AUTH_TYPE is unset so the service
  * can boot idle in environments with no MLS configured at all (e.g. local
  * dev). Once MLS_AUTH_TYPE IS set, every other required field for that auth
  * type — and MLS_BOARD_ID — must be present too: there is no default vendor

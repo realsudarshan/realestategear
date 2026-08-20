@@ -40,7 +40,7 @@ describe('upsertAgent', () => {
     );
     expect(result).toBe(true);
     const call = mockPrisma.mlsAgent.upsert.mock.calls[0][0];
-    // mlsId stored de-prefixed (D17)
+    // mlsId is stored de-prefixed for verification and display.
     expect(call.create.mlsId).toBe('456');
     expect(call.create.providerId).toBe('mlsgrid');
     expect(call.create.externalId).toBe('CANOPY123');

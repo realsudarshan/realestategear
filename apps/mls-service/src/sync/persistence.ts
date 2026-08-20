@@ -20,12 +20,12 @@ export interface MlsPersistenceConfig {
   providerId?: string;
   /** Stored on Listing.mlsBoardId — the compliance/DB board identity. */
   mlsBoardId: string;
-  /** Vendor board prefix to strip from display ids (D17). */
+  /** Vendor board prefix to strip from display IDs. */
   prefix?: string;
-  /** Static bearer token — enables photo download (User-Agent auth, D7). Omit to skip media
+  /** Static bearer token used as User-Agent auth for photo downloads. Omit to skip media
    *  (always omitted for OAuth2 vendors; see config/mls.ts). */
   accessToken?: string;
-  /** Compliance gate (T15/D19): must be true for any listing to be indexed publicly. */
+  /** Fail-closed compliance gate: must be true for any listing to be indexed publicly. */
   publicDisplayEnabled?: boolean;
   /** Vendor's "viewable"/delete flag field name, e.g. MLS Grid's "MlgCanView".
    *  Omit if the vendor has no such flag — removal then relies purely on StandardStatus. */
@@ -89,7 +89,7 @@ function buildPropertyData(record: ResoPropertyRecord) {
   };
 }
 
-/** Listing (market-event) columns. `mlsId` is de-prefixed for display (D17). */
+/** Listing (market-event) columns. `mlsId` is de-prefixed for display. */
 function buildListingData(record: ResoPropertyRecord, config: MlsPersistenceConfig) {
   const { status, recognized } = normalizeStatus(record.StandardStatus);
   if (!recognized) {
@@ -119,7 +119,7 @@ function buildListingData(record: ResoPropertyRecord, config: MlsPersistenceConf
   };
 }
 
-// ── property resolution (D11 + Codex #11 multi-unit guard) ───────────────────
+// ── parcel identity with multi-unit guard ────────────────────────────────────
 type Tx = Prisma.TransactionClient;
 
 /**
@@ -181,7 +181,7 @@ async function uniqueSlug(tx: Tx, address: string, city: string, state: string):
   );
 }
 
-// ── upsert (D12 transaction) ─────────────────────────────────────────────────
+// ── transactional property and listing upsert ────────────────────────────────
 async function upsertPropertyAndListing(
   record: ResoPropertyRecord,
   config: MlsPersistenceConfig,
@@ -239,7 +239,7 @@ async function upsertPropertyAndListing(
     });
 
   // Property + Listing writes are atomic; Typesense indexing happens after commit
-  // (external system, can't roll back) — decision D12.
+  // (an external system that cannot participate in the database transaction).
   //
   // uniqueSlug() checks in-flight siblings via findMany, which can't see another
   // concurrently-processed record's slug until that record's transaction commits.
@@ -277,7 +277,7 @@ async function upsertPropertyAndListing(
     logger.error('[mls] classification failed (DB write committed)', { listingKey, err });
   }
 
-  // Public display gate (D19 + T15 kill-switch): only process public media for an
+  // Fail-closed public display gate: only process public media for an
   // eligible active MLS listing. Reconciliation below independently selects the
   // newest eligible listing, so a hidden MLS update cannot erase a manual listing.
   const publiclyVisible = config.publicDisplayEnabled === true
@@ -327,7 +327,7 @@ async function upsertPropertyAndListing(
   return { outcome: created ? 'created' : 'updated', listingKey, mediaFailed };
 }
 
-// ── removal (D5: MlgCanView=false) ───────────────────────────────────────────
+// ── removal when the configured viewable flag is false ───────────────────────
 async function removeListing(
   record: ResoPropertyRecord,
   config: MlsPersistenceConfig,
@@ -367,7 +367,7 @@ async function removeListing(
 
 /**
  * Process one RESO Property record: branch on the vendor's viewable/delete
- * flag (D5), when one is configured (`config.viewableFlagField` — e.g. MLS
+ * flag, when one is configured (`config.viewableFlagField` — e.g. MLS
  * Grid's "MlgCanView"). `false` means the listing was deleted/withdrawn/
  * withheld — remove it; otherwise upsert. Vendors with no such flag rely
  * purely on StandardStatus (handled inside buildListingData/normalizeStatus).
@@ -376,7 +376,7 @@ export async function processPropertyRecord(
   record: ResoPropertyRecord,
   config: MlsPersistenceConfig,
 ): Promise<ProcessResult> {
-  // Guard against RESO providers that serialize booleans as strings or numbers (D5/D19).
+  // Accept boolean-like strings and numbers from RESO providers.
   const canView = config.viewableFlagField ? (record[config.viewableFlagField] as unknown) : undefined;
   if (canView === false || canView === 'false' || canView === 0) {
     return removeListing(record, config);
