@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readdir, readFile } from "node:fs/promises";
 import test from "node:test";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -42,4 +43,27 @@ test("NativeSelect preserves native form behavior", () => {
 
 test("Skeleton respects reduced-motion preferences", () => {
   assert.match(renderToStaticMarkup(<Skeleton />), /motion-reduce:animate-none/);
+});
+
+test("declares exactly the Radix primitives imported by the package", async () => {
+  const sourceDirectory = new URL("../src/", import.meta.url);
+  const sourceFiles = (await readdir(sourceDirectory)).filter((file) => file.endsWith(".tsx"));
+  const importedPrimitives = new Set<string>();
+
+  for (const file of sourceFiles) {
+    const source = await readFile(new URL(file, sourceDirectory), "utf8");
+    for (const match of source.matchAll(/from ["'](@radix-ui\/react-[^"']+)["']/g)) {
+      importedPrimitives.add(match[1]);
+    }
+  }
+
+  const manifest = JSON.parse(
+    await readFile(new URL("../package.json", import.meta.url), "utf8"),
+  ) as { dependencies: Record<string, string> };
+  const declaredPrimitives = Object.keys(manifest.dependencies).filter((name) =>
+    name.startsWith("@radix-ui/react-"),
+  );
+
+  assert.equal(manifest.dependencies["radix-ui"], undefined);
+  assert.deepEqual(declaredPrimitives.sort(), [...importedPrimitives].sort());
 });
