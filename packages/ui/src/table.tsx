@@ -1,12 +1,25 @@
 "use client"
 
 import * as React from "react"
+import { ArrowDown, ArrowUp, ChevronsUpDown } from "lucide-react"
 
 import { cn } from "@realestategear/tokens"
 
 interface TableProps extends React.ComponentProps<"table"> {
   containerClassName?: string
   containerProps?: Omit<React.ComponentProps<"div">, "children" | "className">
+}
+
+type SortDirection = "ascending" | "descending" | "none"
+
+interface SortableTableHeadProps
+  extends Omit<React.ComponentProps<"th">, "aria-sort"> {
+  sortDirection?: SortDirection
+  onSort: () => void
+  buttonProps?: Omit<
+    React.ComponentProps<"button">,
+    "children" | "onClick" | "type"
+  >
 }
 
 function Table({ className, containerClassName, containerProps, ...props }: TableProps) {
@@ -84,6 +97,39 @@ function TableHead({ className, ...props }: React.ComponentProps<"th">) {
   )
 }
 
+function SortableTableHead({
+  children,
+  sortDirection = "none",
+  onSort,
+  buttonProps,
+  ...props
+}: SortableTableHeadProps) {
+  const { className: buttonClassName, ...restButtonProps } = buttonProps ?? {}
+  const SortIcon = sortDirection === "ascending"
+    ? ArrowUp
+    : sortDirection === "descending"
+      ? ArrowDown
+      : ChevronsUpDown
+
+  return (
+    <TableHead aria-sort={sortDirection} {...props}>
+      <button
+        {...restButtonProps}
+        type="button"
+        data-slot="sortable-table-head-button"
+        onClick={onSort}
+        className={cn(
+          "-mx-2 inline-flex h-8 items-center gap-1 rounded-sm px-2 text-left outline-none transition-colors hover:bg-muted/70 focus-visible:ring-2 focus-visible:ring-ring/80 focus-visible:ring-offset-1 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-50",
+          buttonClassName
+        )}
+      >
+        {children}
+        <SortIcon aria-hidden="true" className="size-3.5 shrink-0 text-muted-foreground" />
+      </button>
+    </TableHead>
+  )
+}
+
 function TableCell({ className, ...props }: React.ComponentProps<"td">) {
   return (
     <td
@@ -116,8 +162,9 @@ export {
   TableBody,
   TableFooter,
   TableHead,
+  SortableTableHead,
   TableRow,
   TableCell,
   TableCaption,
 }
-export type { TableProps }
+export type { SortDirection, SortableTableHeadProps, TableProps }

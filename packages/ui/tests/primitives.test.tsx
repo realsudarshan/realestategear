@@ -9,6 +9,7 @@ import { Button } from "../src/button";
 import { FormMessage } from "../src/form-message";
 import { NativeSelect } from "../src/native-select";
 import { Skeleton } from "../src/skeleton";
+import { SortableTableHead, Table, TableHeader, TableRow } from "../src/table";
 
 test("Button exposes loading state and disables submission", () => {
   const html = renderToStaticMarkup(<Button loading loadingLabel="Saving">Save</Button>);
@@ -43,6 +44,47 @@ test("NativeSelect preserves native form behavior", () => {
 
 test("Skeleton respects reduced-motion preferences", () => {
   assert.match(renderToStaticMarkup(<Skeleton />), /motion-reduce:animate-none/);
+});
+
+test("SortableTableHead represents ascending, descending, and unsorted states", () => {
+  for (const direction of ["ascending", "descending", "none"] as const) {
+    const html = renderToStaticMarkup(
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <SortableTableHead sortDirection={direction} onSort={() => {}}>
+              Price
+            </SortableTableHead>
+          </TableRow>
+        </TableHeader>
+      </Table>,
+    );
+
+    assert.match(html, new RegExp(`aria-sort="${direction}"`));
+  }
+});
+
+test("SortableTableHead uses a labeled native button for keyboard activation", () => {
+  const onSort = () => {};
+  const heading = SortableTableHead({ children: "Price", onSort });
+  const button = React.Children.only(heading.props.children) as React.ReactElement<
+    React.ComponentProps<"button">
+  >;
+  const html = renderToStaticMarkup(
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <SortableTableHead onSort={onSort}>Price</SortableTableHead>
+        </TableRow>
+      </TableHeader>
+    </Table>,
+  );
+
+  assert.equal(button.props.onClick, onSort);
+  assert.equal(button.props.type, "button");
+  assert.match(html, /<th[^>]*aria-sort="none"/);
+  assert.match(html, /<button[^>]*type="button"[^>]*>Price/);
+  assert.match(html, /aria-hidden="true"/);
 });
 
 test("declares exactly the Radix primitives imported by the package", async () => {

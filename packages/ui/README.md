@@ -14,3 +14,23 @@ For example, from a conventional Next.js `app/globals.css`:
 ```
 
 Adjust the relative path for the stylesheet location.
+
+## Sortable Table Headings
+
+`SortableTableHead` owns the native button and `aria-sort` semantics while the
+consumer owns sorting state and behavior:
+
+```tsx
+import { SortableTableHead } from "@realestategear/ui/table";
+
+<SortableTableHead
+  sortDirection={sort === "price-asc" ? "ascending" : "none"}
+  onSort={() => setSort(sort === "price-asc" ? "price-desc" : "price-asc")}
+>
+  Price
+</SortableTableHead>
+```
+
+Use `ascending`, `descending`, or `none` for `sortDirection`. The rendered native
+button supports pointer, Enter, and Space activation without application-specific
+keyboard handling.
