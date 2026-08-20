@@ -34,3 +34,7 @@ import { SortableTableHead } from "@realestategear/ui/table";
 Use `ascending`, `descending`, or `none` for `sortDirection`. The rendered native
 button supports pointer, Enter, and Space activation without application-specific
 keyboard handling.
+
+For sorting, selection, pagination, loading, empty states, keyboard behavior, and
+optional TanStack composition, see the
+[data table boundary](https://github.com/realestategear/realestategear/blob/main/docs/DATA_TABLES.md).
