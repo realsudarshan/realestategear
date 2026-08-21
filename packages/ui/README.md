@@ -38,3 +38,27 @@ keyboard handling.
 For sorting, selection, pagination, loading, empty states, keyboard behavior, and
 optional TanStack composition, see the
 [data table boundary](https://github.com/realestategear/realestategear/blob/main/docs/DATA_TABLES.md).
+
+## Calendar
+
+`Calendar` styles `react-day-picker` while leaving date policy and state with the
+consumer:
+
+```tsx
+import { Calendar } from "@realestategear/ui/calendar";
+
+<Calendar
+  mode="single"
+  selected={date}
+  onSelect={setDate}
+  locale={locale}
+  weekStartsOn={1}
+  startMonth={new Date(2026, 0)}
+  endMonth={new Date(2026, 11)}
+  disabled={{ before: new Date() }}
+/>
+```
+
+Pass locale, week start, boundaries, disabled matchers, selection mode, and
+callbacks explicitly when product policy requires them. The underlying DayPicker
+provides labeled navigation, roving day focus, and keyboard grid navigation.

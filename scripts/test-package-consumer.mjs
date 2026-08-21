@@ -47,21 +47,25 @@ import assert from "node:assert/strict";
 import { resolvePublicApiBaseUrl } from "@realestategear/api-client";
 import { compileThemeCss } from "@realestategear/tokens/theme";
 import { Button, NativeSelect, Popover } from "@realestategear/ui";
+import { Calendar } from "@realestategear/ui/calendar";
 import { SortableTableHead } from "@realestategear/ui/table";
 assert.equal(resolvePublicApiBaseUrl({ NEXT_PUBLIC_API_URL: "https://api.example.com/" }), "https://api.example.com");
 assert.match(compileThemeCss({ palette: { primary: "#065f46" } }), /--primary:/);
 assert.equal(typeof Button, "function");
 assert.equal(typeof NativeSelect, "function");
 assert.equal(typeof Popover, "function");
+assert.equal(typeof Calendar, "function");
 assert.equal(typeof SortableTableHead, "function");
 assert.match(import.meta.resolve("@realestategear/tokens/preset.css"), /preset\\.css$/);
 `);
 
   await writeFile(join(directory, "consumer.tsx"), `
 import { Button, NativeSelect } from "@realestategear/ui";
+import { Calendar } from "@realestategear/ui/calendar";
 import { SortableTableHead } from "@realestategear/ui/table";
 export const form = <form><NativeSelect name="status"><option value="active">Active</option></NativeSelect><Button type="submit" loading={false}>Save</Button></form>;
 export const heading = <SortableTableHead sortDirection="ascending" onSort={() => {}}>Price</SortableTableHead>;
+export const calendar = <Calendar mode="single" weekStartsOn={1} />;
 `);
   await writeFile(join(directory, "tsconfig.json"), JSON.stringify({
     compilerOptions: {

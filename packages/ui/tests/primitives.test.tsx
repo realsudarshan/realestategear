@@ -3,9 +3,11 @@ import { readdir, readFile } from "node:fs/promises";
 import test from "node:test";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
+import { es } from "react-day-picker/locale";
 
 import { Alert } from "../src/alert";
 import { Button } from "../src/button";
+import { Calendar } from "../src/calendar";
 import { FormMessage } from "../src/form-message";
 import { NativeSelect } from "../src/native-select";
 import { Skeleton } from "../src/skeleton";
@@ -40,6 +42,43 @@ test("NativeSelect preserves native form behavior", () => {
   );
   assert.match(html, /name="status"/);
   assert.match(html, /selected=""/);
+});
+
+test("Calendar applies locale and week-start behavior", () => {
+  const html = renderToStaticMarkup(
+    <Calendar
+      locale={es}
+      month={new Date(2026, 7, 1)}
+      mode="single"
+      weekStartsOn={1}
+    />,
+  );
+  const weekdays = [...html.matchAll(/<th aria-label="([^"]+)"/g)].map((match) => match[1]);
+
+  assert.match(html, /lang="es"/);
+  assert.match(html, />agosto 2026</);
+  assert.deepEqual(weekdays, ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"]);
+});
+
+test("Calendar exposes boundaries, disabled dates, and keyboard grid semantics", () => {
+  const august = new Date(2026, 7, 1);
+  const html = renderToStaticMarkup(
+    <Calendar
+      disabled={new Date(2026, 7, 20)}
+      endMonth={august}
+      month={august}
+      mode="single"
+      startMonth={august}
+    />,
+  );
+
+  assert.match(html, /role="grid"/);
+  assert.match(html, /aria-label="Saturday, August 1st, 2026"/);
+  assert.match(html, /type="button" tabindex="0"/);
+  assert.match(html, /data-day="2026-08-20" data-disabled="true"/);
+  assert.match(html, /aria-label="Go to the Previous Month"/);
+  assert.match(html, /aria-label="Go to the Next Month"/);
+  assert.equal((html.match(/aria-disabled="true"/g) ?? []).length, 2);
 });
 
 test("Skeleton respects reduced-motion preferences", () => {
