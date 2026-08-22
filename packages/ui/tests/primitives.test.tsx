@@ -28,6 +28,7 @@ import {
 } from "../src/date-time-picker.utils";
 import { FormMessage } from "../src/form-message";
 import { NativeSelect } from "../src/native-select";
+import { SelectionCard } from "../src/selection-card";
 import { Skeleton } from "../src/skeleton";
 import { SortableTableHead, Table, TableHeader, TableRow } from "../src/table";
 
@@ -60,6 +61,67 @@ test("NativeSelect preserves native form behavior", () => {
   );
   assert.match(html, /name="status"/);
   assert.match(html, /selected=""/);
+});
+
+test("SelectionCard exposes native checkbox form and error semantics", () => {
+  const html = renderToStaticMarkup(
+    <SelectionCard
+      id="email-choice"
+      type="checkbox"
+      name="channels"
+      value="email"
+      label="Email"
+      description="Receive email updates."
+      error="Choose at least one channel."
+      visual={<span>Mail</span>}
+      checked
+      required
+      onChange={() => {}}
+    />,
+  );
+
+  assert.match(html, /<input[^>]*id="email-choice"[^>]*type="checkbox"/);
+  assert.match(html, /name="channels"/);
+  assert.match(html, /value="email"/);
+  assert.match(html, /required=""/);
+  assert.match(html, /checked=""/);
+  assert.match(html, /aria-describedby="email-choice-description email-choice-error"/);
+  assert.match(html, /aria-invalid="true"/);
+  assert.match(html, /<label[^>]*for="email-choice"/);
+  assert.match(html, /id="email-choice-description"/);
+  assert.match(html, /role="alert"/);
+  assert.match(html, /data-slot="selection-card-visual"/);
+});
+
+test("SelectionCard preserves native radio keyboard grouping and disabled state", () => {
+  const html = renderToStaticMarkup(
+    <div role="radiogroup" aria-label="Plan">
+      <SelectionCard
+        id="plan-one"
+        type="radio"
+        name="plan"
+        value="one"
+        label="Plan one"
+        defaultChecked
+      />
+      <SelectionCard
+        id="plan-two"
+        type="radio"
+        name="plan"
+        value="two"
+        label="Plan two"
+        disabled
+      />
+    </div>,
+  );
+
+  assert.equal((html.match(/type="radio"/g) ?? []).length, 2);
+  assert.equal((html.match(/name="plan"/g) ?? []).length, 2);
+  assert.match(html, /id="plan-one"[^>]*checked=""/);
+  assert.match(html, /id="plan-two"[^>]*disabled=""/);
+  assert.match(html, /peer-focus-visible:ring-2/);
+  assert.match(html, /peer-checked:border-primary/);
+  assert.match(html, /motion-reduce:transition-none/);
 });
 
 test("Calendar applies locale and week-start behavior", () => {

@@ -150,3 +150,42 @@ requires a title, description, and command label; it ships no hidden default cop
 selection, and filtering. Applications remain responsible for opening shortcuts,
 item labels, action callbacks, routing, async data, and whether filtering is local
 or remote.
+
+## Selection Cards
+
+`SelectionCard` turns a native radio or checkbox into a visually rich card without
+replacing browser form and keyboard behavior:
+
+```tsx
+import { SelectionCard } from "@realestategear/ui/selection-card";
+
+<fieldset>
+  <legend>Contact method</legend>
+  <SelectionCard
+    type="radio"
+    name="contactMethod"
+    value="email"
+    label="Email"
+    description="Receive updates by email."
+    visual={<MailIcon aria-hidden="true" />}
+    checked={method === "email"}
+    onChange={() => setMethod("email")}
+  />
+  <SelectionCard
+    type="radio"
+    name="contactMethod"
+    value="phone"
+    label="Phone"
+    description="Receive updates by phone."
+    disabled
+  />
+</fieldset>
+```
+
+Use a `fieldset` and `legend` for related radio cards. Native radios retain Tab,
+Arrow key, and Space behavior; native checkboxes retain Tab and Space behavior.
+The input remains in the accessibility tree and form submission while the card
+label owns visual, focus-visible, selected, disabled, invalid, and reduced-motion
+states. `visual` may contain rich content; consumers decide whether that content
+is informative or marked decorative. Description and error content are linked to
+the input with stable IDs, and errors use an alert role.
