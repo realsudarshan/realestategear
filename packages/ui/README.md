@@ -108,3 +108,45 @@ its value is `value.toISOString()` when selected and an empty string when clear.
 by the consuming form because hidden inputs do not provide native required-value
 validation. The visible label targets the date button, and description and error
 messages are referenced by both date and time controls.
+
+## Command Menus
+
+Command primitives wrap `cmdk` without owning an application's catalog, routes,
+shortcuts, filtering policy, or execution behavior:
+
+```tsx
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+  CommandLoading,
+  CommandShortcut,
+} from "@realestategear/ui/command";
+
+<Command label="Available actions">
+  <CommandInput label="Search actions" placeholder="Search" />
+  <CommandList>
+    {loading ? <CommandLoading>Fetching actions</CommandLoading> : null}
+    <CommandEmpty>No matching actions</CommandEmpty>
+    <CommandGroup heading="Actions">
+      <CommandItem value="create" onSelect={createRecord}>
+        Create record
+        <CommandShortcut>Control N</CommandShortcut>
+      </CommandItem>
+      <CommandItem value="unavailable" disabled>
+        Unavailable action
+      </CommandItem>
+    </CommandGroup>
+  </CommandList>
+</Command>
+```
+
+`Command` and `CommandInput` require accessible labels. `CommandDialog` also
+requires a title, description, and command label; it ships no hidden default copy.
+`cmdk` supplies combobox/listbox focus management, Arrow Up/Down navigation, Enter
+selection, and filtering. Applications remain responsible for opening shortcuts,
+item labels, action callbacks, routing, async data, and whether filtering is local
+or remote.

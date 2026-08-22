@@ -8,6 +8,16 @@ import { es } from "react-day-picker/locale";
 import { Alert } from "../src/alert";
 import { Button } from "../src/button";
 import { Calendar } from "../src/calendar";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+  CommandLoading,
+  CommandShortcut,
+} from "../src/command";
 import { DateTimePicker } from "../src/date-time-picker";
 import {
   combineCalendarDateAndTime,
@@ -87,6 +97,53 @@ test("Calendar exposes boundaries, disabled dates, and keyboard grid semantics",
   assert.match(html, /aria-label="Go to the Previous Month"/);
   assert.match(html, /aria-label="Go to the Next Month"/);
   assert.equal((html.match(/aria-disabled="true"/g) ?? []).length, 2);
+});
+
+test("Command exposes keyboard navigation and focus semantics", () => {
+  const html = renderToStaticMarkup(
+    <Command label="Available actions">
+      <CommandInput label="Search actions" />
+      <CommandList>
+        <CommandGroup heading="Actions">
+          <CommandItem value="first-action">
+            First action
+            <CommandShortcut>Control A</CommandShortcut>
+          </CommandItem>
+          <CommandItem value="unavailable-action" disabled>
+            Unavailable action
+          </CommandItem>
+        </CommandGroup>
+      </CommandList>
+    </Command>,
+  );
+  const controls = html.match(/aria-controls="([^"]+)"/)?.[1];
+  const listId = html.match(/role="listbox"[^>]*id="([^"]+)"/)?.[1];
+
+  assert.match(html, />Available actions<\/label>/);
+  assert.match(html, /aria-label="Search actions"/);
+  assert.match(html, /role="combobox"/);
+  assert.match(html, /aria-autocomplete="list"/);
+  assert.equal(controls, listId);
+  assert.match(html, /role="group"/);
+  assert.match(html, /role="option" aria-disabled="true"/);
+  assert.match(html, />Control A<\/span>/);
+});
+
+test("Command supports consumer-owned loading and empty states", () => {
+  const html = renderToStaticMarkup(
+    <Command label="Available actions">
+      <CommandInput label="Search actions" />
+      <CommandList>
+        <CommandLoading>Fetching actions</CommandLoading>
+        <CommandEmpty>No matching actions</CommandEmpty>
+      </CommandList>
+    </Command>,
+  );
+
+  assert.match(html, /data-slot="command-loading" role="status" aria-live="polite"/);
+  assert.match(html, />Fetching actions<\/div>/);
+  assert.match(html, />No matching actions<\/div>/);
+  assert.doesNotMatch(html, /aria-label="Loading\.\.\."/);
 });
 
 test("DateTimePicker exposes its accessible form contract in static markup", () => {

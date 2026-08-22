@@ -13,8 +13,7 @@ type DateTimePickerHandlerOptions = {
 }
 
 function getDateParts(value: Date, timeZone: DateTimePickerTimeZone) {
-  const isUtc = timeZone === "UTC"
-  return isUtc
+  return timeZone === "UTC"
     ? {
         year: value.getUTCFullYear(),
         month: value.getUTCMonth(),
