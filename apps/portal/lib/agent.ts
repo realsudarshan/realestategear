@@ -369,3 +369,49 @@ export type AgentNote = {
   transaction?: { id: string; address: string | null } | null;
   event?: { id: string; title: string; startAt: string } | null;
 };
+
+export type AgentProperty = {
+  id: string; address: string; city: string; state: string; zipCode?: string | null;
+  propertyType?: string | null; bedrooms?: number | null; bathrooms?: number | null;
+  squareFeet?: number | null; yearBuilt?: number | null; imageUrl?: string | null;
+  media?: Array<{ id: string; url: string; caption?: string | null }>;
+  listingId?: string | null; mlsId?: string | null; status?: string | null;
+  price?: number | null; listPrice?: number | null; description?: string | null;
+};
+
+export type AgentPropertyListResponse = {
+  properties: AgentProperty[];
+  pagination: { page: number; limit: number; total: number; totalPages: number; pages?: number };
+};
+
+export type AgentListingCard = AgentProperty & {
+  listingKey?: string | null; mlsBoardId?: string | null; mlsBoardName?: string | null;
+  slug?: string | null; listDate?: string | null; brokerageName?: string | null;
+  listingAgentName?: string | null;
+};
+
+export type AgentDiscoveryResponse = {
+  setup: { hasMlsAccess: boolean; hasSegments: boolean; hasDeployedSegments: boolean; mlsBoards: Array<Record<string, unknown>> };
+  defaultFeed: { label: string; listings: AgentListingCard[] } | null;
+  segmentFeeds: Array<{ segmentId: string; segmentName: string; portalCount: number; listingCount: number; listings: AgentListingCard[] }>;
+};
+
+export type AgentListingDetailResponse = {
+  listing: AgentListingCard & {
+    source?: string | null; closeDate?: string | null; description?: string | null;
+    rawData?: Record<string, unknown> | null;
+    agent: { name?: string | null; email?: string | null; phone?: string | null };
+    brokerage: { name?: string | null; phone?: string | null };
+    updatedAt?: string;
+  };
+  property: AgentProperty & { latitude?: number | null; longitude?: number | null; lotSize?: number | null; subdivision?: string | null; parcelId?: string | null };
+  media: Array<{ id: string; url: string; caption?: string | null; order: number }>;
+  propertyHistory: AgentListingCard[];
+  workflow: { canCreateTransaction: boolean; transactions: Array<{ id: string; type: string; stage: string; address: string | null; mlsId: string | null; listPrice: number | null; salePrice: number | null; closingDate: string | null; updatedAt: string }> };
+};
+
+export type AgentSearchCollection<T = Record<string, unknown>> = { items: T[]; total: number };
+export type AgentUnifiedSearchResponse = {
+  contacts: AgentSearchCollection; transactions: AgentSearchCollection;
+  properties: AgentSearchCollection<AgentProperty>; tasks: AgentSearchCollection;
+};
