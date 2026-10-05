@@ -1,0 +1,78 @@
+# Real Estate Gear Core
+
+This repository contains the public, self-hostable core for a real estate portal:
+a Next.js customer experience, an Express API, shared packages, Prisma
+migrations, and an optional MLS worker. It is designed to run from one npm
+workspace against PostgreSQL.
+
+Commercial applications, private admin surfaces, client-specific products, and
+private operational notes are not part of this repository.
+
+## What Runs Here
+
+The default local app is the portal at <http://localhost:3006>. It talks to the
+API at <http://localhost:3001>, usually through same-origin `/api/*` rewrites.
+
+PostgreSQL is required. Redis and Typesense can be added, but the base stack does
+not depend on either service. The Agent API is present behind a guard and should
+stay disabled unless a deployment explicitly opts in with `AGENT_API_ENABLED=true`.
+
+## Services
+
+| Location | Role |
+| --- | --- |
+| `apps/portal` | Public Next.js frontend for search, listings, inquiries, accounts, and favorites. |
+| `apps/api` | Express service backed by Prisma and PostgreSQL. |
+| `apps/mls-service` | Separate MLS synchronization process; dormant without board credentials. |
+| `apps/typesense` | Optional search service tooling. |
+| `packages/db` | Prisma schema, migrations, and guarded seed commands. |
+| `packages/ui`, `packages/tokens` | Shared interface components and design tokens. |
+| `packages/search`, `packages/cache`, `packages/email` | Optional infrastructure integrations used by the API and portal. |
+
+## Local Setup
+
+Use Node `>=22.12.0 <23` and npm. This project uses `package-lock.json`; do not
+switch the workspace to pnpm or Yarn.
+
+```bash
+npm install
+cp .env.example .env
+npm run db:migrate
+npm run dev
+```
+
+`npm run dev` starts the portal workflow, including the API process.
+
+## Database Seeds
+
+An empty PostgreSQL database is a supported starting point. Demo data is opt-in
+and guarded by the exact database target from `DATABASE_URL`.
+
+```bash
+export CONFIRM_DEMO_SEED='<host>:<port>/<database>'
+npm run db:seed:portal
+npm run db:seed:demo-listings
+```
+
+Never configure demo seed confirmation in production. Guarded destructive reset
+commands are available for local demo environments only.
+
+## Daily Commands
+
+```bash
+npm run dev
+npm run dev:api
+npm run dev:portal
+npm run dev --workspace=@realestategear/mls-service
+npm run build:api
+npm run build --workspace=portal
+npm run test:api
+npm run test:portal
+npm run test --workspace=@realestategear/mls-service
+npm run typecheck:api
+npm run typecheck:portal
+npm run typecheck:mls
+```
+
+For package publishing checks, use Node `22.14.0` or newer.
+

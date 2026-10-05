@@ -3,6 +3,8 @@ dist
 .next
 out
 packages/db/generated/
+/docs
+/.github
 
 .env*
 !.env.example
