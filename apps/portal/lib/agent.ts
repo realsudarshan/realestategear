@@ -127,6 +127,50 @@ export type AgentDashboardData = {
   upcomingTasks: AgentDashboardTask[];
 };
 
+export function isAgentDashboardData(value: unknown): value is AgentDashboardData {
+  if (!value || typeof value !== "object") return false;
+  const data = value as Partial<AgentDashboardData>;
+  const stats = data.stats;
+  if (!stats || typeof stats !== "object") return false;
+
+  const statKeys: (keyof AgentDashboardStats)[] = [
+    "activeContacts",
+    "openTransactions",
+    "pendingTasks",
+    "closedThisMonth",
+  ];
+  if (statKeys.some((key) => typeof stats[key] !== "number" || !Number.isFinite(stats[key]))) {
+    return false;
+  }
+
+  if (!Array.isArray(data.recentContacts) || !Array.isArray(data.upcomingTasks)) return false;
+  return (
+    data.recentContacts.every((contact) => {
+      if (!contact || typeof contact !== "object") return false;
+      return (
+        typeof contact.id === "string" &&
+        (contact.firstName === null || typeof contact.firstName === "string") &&
+        (contact.lastName === null || typeof contact.lastName === "string") &&
+        (contact.type === null || typeof contact.type === "string") &&
+        (contact.stage === null || typeof contact.stage === "string") &&
+        (contact.email === null || typeof contact.email === "string") &&
+        (contact.phone === null || typeof contact.phone === "string") &&
+        typeof contact.createdAt === "string"
+      );
+    }) &&
+    data.upcomingTasks.every((task) => {
+      if (!task || typeof task !== "object") return false;
+      return (
+        typeof task.id === "string" &&
+        typeof task.title === "string" &&
+        (task.dueDate === null || typeof task.dueDate === "string") &&
+        (task.priority === null || typeof task.priority === "string") &&
+        typeof task.status === "string"
+      );
+    })
+  );
+}
+
 export function isDashboardEmpty(data: AgentDashboardData): boolean {
   return (
     data.stats.activeContacts === 0 &&
