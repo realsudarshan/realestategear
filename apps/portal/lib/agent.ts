@@ -181,3 +181,66 @@ export function isDashboardEmpty(data: AgentDashboardData): boolean {
     data.upcomingTasks.length === 0
   );
 }
+
+export type AgentContactTrack = {
+  id?: string;
+  side: string;
+  stage: string;
+  isActive: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export type AgentContact = {
+  id: string;
+  accountId?: string;
+  type: string;
+  firstName: string;
+  lastName: string;
+  email: string | null;
+  phone: string | null;
+  company: string | null;
+  source: string | null;
+  stage: string;
+  tags: string[] | null;
+  avatarUrl?: string | null;
+  userId?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  buyerTrack?: AgentContactTrack | null;
+  sellerTrack?: AgentContactTrack | null;
+  tracks?: AgentContactTrack[];
+  lastContactAt?: string | null;
+  lastConsultAt?: string | null;
+  lastEventAt?: string | null;
+  user?: {
+    id: string;
+    email: string;
+    firstName: string | null;
+    lastName: string | null;
+    _count?: { favorites: number; inquiries: number; savedSearches: number };
+  } | null;
+  interactions?: AgentInteraction[];
+  transactionParties?: Array<{ transaction: Record<string, unknown> }>;
+  tasks?: Array<Record<string, unknown>>;
+  notes?: Array<Record<string, unknown>>;
+  eventAttendees?: Array<{ event: Record<string, unknown> }>;
+};
+
+export type AgentInteraction = {
+  id: string;
+  contactId: string;
+  type: string;
+  side: string | null;
+  subject: string | null;
+  body: string | null;
+  occurredAt: string;
+  duration: number | null;
+  createdAt: string;
+};
+
+export type AgentContactListResponse = {
+  contacts: AgentContact[];
+  pagination: { page: number; limit: number; total: number; totalPages: number };
+  lifecycleCounts: { prospect: number; activeLead: number; client: number; vendor: number };
+};
