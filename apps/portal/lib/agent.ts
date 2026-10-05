@@ -347,3 +347,25 @@ export type AgentDiscoveredMessage = {
     matchedDocument?: { id: string; label: string; status: string } | null;
   }>;
 };
+
+export type AgentTask = {
+  id: string; title: string; description: string | null; dueDate: string | null;
+  priority: string; status: string; contactId: string | null; transactionId: string | null;
+  contact?: { id: string; firstName: string; lastName: string } | null;
+  transaction?: { id: string; address: string | null; stage: string } | null;
+};
+
+export type AgentEvent = {
+  id: string; type: string; customType: string | null; title: string; description: string | null;
+  location: string | null; startAt: string; endAt: string; isAllDay: boolean; status: string;
+  transactionId: string | null; providerSyncError: string | null; lastSyncedAt: string | null;
+  attendees: Array<{ id: string; contactId: string; role: string | null; contact: { id: string; firstName: string; lastName: string; email?: string | null } }>;
+  transaction?: { id: string; address: string | null; stage: string; type: string } | null;
+};
+
+export type AgentNote = {
+  id: string; body: string; createdAt: string; contactId: string | null; transactionId: string | null;
+  eventId: string | null; contact?: { id: string; firstName: string; lastName: string } | null;
+  transaction?: { id: string; address: string | null } | null;
+  event?: { id: string; title: string; startAt: string } | null;
+};
