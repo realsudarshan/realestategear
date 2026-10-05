@@ -1,10 +1,13 @@
 import Link from "next/link";
 import { AgentLogoutButton } from "./agent-logout-button";
 import type { AgentPublicUser } from "@/lib/agent";
+import { AgentSearchPalette } from "./agent-property-discovery";
 
 const NAV = [
   { href: "/agent", label: "Dashboard" },
   { href: "/agent/contacts", label: "Contacts" },
+  { href: "/agent/properties", label: "Properties" },
+  { href: "/agent/listings", label: "Listings" },
   { href: "/agent/transactions", label: "Transactions" },
   { href: "/agent/tasks", label: "Tasks" },
   { href: "/agent/events", label: "Calendar" },
@@ -37,6 +40,7 @@ export function AgentShell({
             <p className="text-sm font-semibold">{name}</p>
           </div>
           <nav aria-label="Agent" className="flex flex-wrap items-center gap-1">
+            <AgentSearchPalette />
             {NAV.map((item) => (
               <Link
                 key={item.href}
