@@ -13,9 +13,10 @@ export function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const from = safePath(searchParams.get("from"));
+  const googleError = searchParams.get("google_error");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
+  const [error, setError] = useState(googleError ? "Google sign-in failed. Try again." : "");
   const [pending, setPending] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {

@@ -2,6 +2,8 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { tokenCookieOptions } from "./auth";
 
+export type SessionCookieOptions = ReturnType<typeof tokenCookieOptions>;
+
 /**
  * Turns an upstream auth response (login/register) into the client-facing
  * response: sets the httpOnly session cookie server-side and strips the raw
@@ -13,7 +15,10 @@ import { tokenCookieOptions } from "./auth";
  * Falls back to relaying the upstream body verbatim if it isn't the
  * {token, ...} shape we expect (e.g. an error response).
  */
-export async function establishSessionResponse(upstream: Response): Promise<NextResponse> {
+export async function establishSessionResponse(
+  upstream: Response,
+  cookieForToken: (token: string) => SessionCookieOptions = tokenCookieOptions,
+): Promise<NextResponse> {
   const data = await upstream.text();
   const contentType = upstream.headers.get("content-type") ?? "application/json";
 
@@ -22,7 +27,7 @@ export async function establishSessionResponse(upstream: Response): Promise<Next
       const parsed = JSON.parse(data) as Record<string, unknown>;
       if (typeof parsed.token === "string") {
         const cookieStore = await cookies();
-        cookieStore.set(tokenCookieOptions(parsed.token));
+        cookieStore.set(cookieForToken(parsed.token));
         const { token: _token, ...rest } = parsed;
         return NextResponse.json(rest, { status: upstream.status });
       }
