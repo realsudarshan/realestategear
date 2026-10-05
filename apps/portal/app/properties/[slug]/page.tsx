@@ -8,6 +8,7 @@ import { getPortalProperty, type PortalPropertyDetail } from "@/lib/listings";
 import { getPublicSiteUrl } from "@/lib/site-url";
 
 const SITE_URL = getPublicSiteUrl();
+const siteName = process.env.NEXT_PUBLIC_SITE_NAME || "Example Realty";
 
 function formatPrice(price: number | null) {
   if (price == null) return "Price available on request";
@@ -90,8 +91,8 @@ function PropertyJsonLd({ property }: { property: PortalPropertyDetail }) {
   );
 }
 
-export default async function PropertyDetailPage({
-  const siteName = process.env.NEXT_PUBLIC_SITE_NAME || "Example Realty"; params }: { params: Promise<{ slug: string }> }) {
+export default async function PropertyDetailPage({ params }: { params: Promise<{ slug: string }> }) {
+  const siteName = process.env.NEXT_PUBLIC_SITE_NAME || "Example Realty";
   const { slug } = await params;
   const property = await getPortalProperty(slug);
   if (!property) notFound();

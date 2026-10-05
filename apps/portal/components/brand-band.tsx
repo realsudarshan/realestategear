@@ -6,7 +6,7 @@ import { FadeIn, StaggerContainer, StaggerItem } from "@realestategear/ui/motion
 const SUB_AREAS = ["Lake Norman", "South Charlotte", "Union County", "Fort Mill SC"] as const
 
 // Elevated luxury hero band with motion interactions and architectural grid overlay
-export function BrandBand({ siteName = `${siteName}` }: { siteName?: string }) {
+export function BrandBand({ siteName = "Example Realty" }: { siteName?: string }) {
   return (
     <section className="relative overflow-hidden border-b border-border bg-primary text-primary-foreground">
       {/* Decorative gradient overlay */}

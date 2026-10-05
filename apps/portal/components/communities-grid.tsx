@@ -7,7 +7,7 @@ import { ArrowRight } from "lucide-react"
 
 function CommunityCard({ community }: { community: CommunityFrontmatter }) {
   return (
-    <MotionCard asChild>
+    <MotionCard>
       <Link
         href={`/communities/${community.slug}`}
         className="group flex h-full flex-col p-6 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"

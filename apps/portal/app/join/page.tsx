@@ -8,7 +8,7 @@ import { JoinForm } from "@/components/join-form";
 import { getSessionUser } from "@/lib/session-user-server";
 import { safePath } from "@/lib/safe-path";
 
-const siteName = process.env.NEXT_PUBLIC_SITE_NAME || `${siteName}`;
+const siteName = process.env.NEXT_PUBLIC_SITE_NAME || "Example Realty";
 
 export const metadata: Metadata = {
   title: `Join | ${siteName}`,

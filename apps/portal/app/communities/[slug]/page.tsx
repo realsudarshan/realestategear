@@ -8,6 +8,8 @@ import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { getCommunity, getCommunitySlugs } from "@/lib/communities";
 
+const siteName = process.env.NEXT_PUBLIC_SITE_NAME || "Example Realty";
+
 // Only the known community slugs are valid; anything else 404s (per the B0 spec).
 export const dynamicParams = false;
 
@@ -42,11 +44,11 @@ const mdxComponents = {
 };
 
 export default async function CommunityGuidePage({
-  const siteName = process.env.NEXT_PUBLIC_SITE_NAME || "Example Realty";
   params,
 }: {
   params: Promise<{ slug: string }>;
 }) {
+  const siteName = process.env.NEXT_PUBLIC_SITE_NAME || "Example Realty";
   const { slug } = await params;
   const doc = getCommunity(slug);
   if (!doc) notFound();

@@ -8,7 +8,7 @@ import { PropertySearchForm } from "@/components/property-search-form";
 import { PropertyCard } from "@/components/property-card";
 import { getPortalListings } from "@/lib/listings";
 
-const siteName = process.env.NEXT_PUBLIC_SITE_NAME || `${siteName}`;
+const siteName = process.env.NEXT_PUBLIC_SITE_NAME || "Example Realty";
 
 export const metadata: Metadata = {
   title: `Properties | ${siteName}`,

@@ -8,7 +8,7 @@ import { RemoveFavoriteButton } from "@/components/remove-favorite-button";
 import { getSessionUser } from "@/lib/session-user-server";
 import { getToken } from "@/lib/auth";
 
-const siteName = process.env.NEXT_PUBLIC_SITE_NAME || `${siteName}`;
+const siteName = process.env.NEXT_PUBLIC_SITE_NAME || "Example Realty";
 
 export const metadata: Metadata = {
   title: `Favorites | ${siteName}`,

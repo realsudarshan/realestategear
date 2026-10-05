@@ -4,7 +4,7 @@ import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { getCommunities, type SubArea } from "@/lib/communities";
 
-const siteName = process.env.NEXT_PUBLIC_SITE_NAME || `${siteName}`;
+const siteName = process.env.NEXT_PUBLIC_SITE_NAME || "Example Realty";
 
 export const metadata: Metadata = {
   title: `Golf Communities | ${siteName}`,
