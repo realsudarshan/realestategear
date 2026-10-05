@@ -19,6 +19,8 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": rootDir,
+      react: path.resolve(rootDir, "../../node_modules/react"),
+      "react-dom": path.resolve(rootDir, "../../node_modules/react-dom"),
     },
   },
 });
