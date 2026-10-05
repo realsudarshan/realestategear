@@ -40,27 +40,35 @@ export function AgentLeadInbox() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [counts, setCounts] = useState<Record<Status, number>>({ NEW: 0, READ: 0, RESPONDED: 0, ARCHIVED: 0 });
+  const [portals, setPortals] = useState<Array<{ id: string; name: string }>>([]);
+  const [portalId, setPortalId] = useState("");
   const query = useMemo(() => { const params = new URLSearchParams({ page: String(page), limit: "20" }); if (status) params.set("status", status); if (search.trim()) params.set("search", search.trim()); return params.toString(); }, [page, search, status]);
   const load = useCallback(async () => {
     try {
       setLoading(true); setError("");
-      const next = await request(`/api/agent/inquiries?${query}`) as ResponseData;
+      const next = portalId
+        ? await request(`/api/agent/portals/${portalId}/inquiries?limit=20${status ? `&status=${status}` : ""}`).then((body) => ({ inquiries: body.inquiries, pagination: { page: 1, limit: 20, total: body.counts.total, totalPages: 1 } }))
+        : await request(`/api/agent/inquiries?${query}`) as ResponseData;
       setData(next);
-      if (page === 1 && !search.trim()) {
+      if (portalId && page === 1) {
+        const portalBody = await request(`/api/agent/portals/${portalId}/inquiries?limit=1${status ? `&status=${status}` : ""}`);
+        setCounts((current) => ({ ...current, ...(portalBody.counts as Record<Status, number>) }));
+      } else if (page === 1 && !search.trim()) {
         const countResults = await Promise.all((["NEW", "READ", "RESPONDED", "ARCHIVED"] as Status[]).map((item) => request(`/api/agent/inquiries?status=${item}&limit=1`)));
         setCounts(Object.fromEntries((["NEW", "READ", "RESPONDED", "ARCHIVED"] as Status[]).map((item, index) => [item, countResults[index].pagination.total])) as Record<Status, number>);
       }
     }
     catch (cause) { setError(cause instanceof Error ? cause.message : "Unable to load inquiries."); }
     finally { setLoading(false); }
-  }, [query]);
+  }, [portalId, query, status]);
   useEffect(() => { void load(); }, [load]);
+  useEffect(() => { void request("/api/agent/portals").then((body) => { if (Array.isArray(body)) setPortals(body); }).catch(() => undefined); }, []);
   if (error) return <ErrorState message={error === "UNAUTHORIZED" ? "Your Agent session has expired." : error} retry={() => void load()} />;
   if (!data) return <Skeleton aria-label="Loading inquiries" className="h-96 w-full" />;
   return <div className="flex flex-col gap-6">
     <div className="flex flex-wrap items-end justify-between gap-3"><div><h1 className="text-xl font-semibold">Lead inbox</h1><p className="mt-1 text-sm text-muted-foreground">{data.pagination.total} inquiries</p></div><a className="inline-flex h-9 items-center rounded-md border px-3 text-sm font-medium hover:bg-accent" href={`/api/proxy/owner/leads/export.csv?${new URLSearchParams({ ...(status ? { status } : {}), ...(search ? { search } : {}) })}`}>Export CSV</a></div>
     <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">{(["NEW", "READ", "RESPONDED", "ARCHIVED"] as Status[]).map((item) => <button type="button" key={item} className={`rounded-md border p-3 text-left ${status === item ? "border-primary bg-card" : "bg-background"}`} onClick={() => { setStatus(status === item ? "" : item); setPage(1); }}><span className="block text-xs text-muted-foreground">{item}</span><strong>{status === item ? data.pagination.total : counts[item]}</strong></button>)}</div>
-    <div className="grid gap-3 rounded-md border bg-card p-4 sm:grid-cols-3"><label className="text-sm font-medium sm:col-span-2">Search visitor name, email, or property address<Input value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} /></label><label className="text-sm font-medium">Status<NativeSelect value={status} onChange={(event) => { setStatus(event.target.value); setPage(1); }}><option value="">All statuses</option><option>NEW</option><option>READ</option><option>RESPONDED</option><option>ARCHIVED</option></NativeSelect></label></div>
+    <div className="grid gap-3 rounded-md border bg-card p-4 sm:grid-cols-4"><label className="text-sm font-medium sm:col-span-2">Search visitor name, email, or property address<Input value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} /></label><label className="text-sm font-medium">Status<NativeSelect value={status} onChange={(event) => { setStatus(event.target.value); setPage(1); }}><option value="">All statuses</option><option>NEW</option><option>READ</option><option>RESPONDED</option><option>ARCHIVED</option></NativeSelect></label>{portals.length ? <label className="text-sm font-medium">Portal<NativeSelect value={portalId} onChange={(event) => { setPortalId(event.target.value); setPage(1); }}><option value="">All portals</option>{portals.map((portal) => <option key={portal.id} value={portal.id}>{portal.name}</option>)}</NativeSelect></label> : null}</div>
     {loading ? <Skeleton aria-label="Refreshing inquiries" className="h-32 w-full" /> : data.inquiries.length ? <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(18rem,0.8fr)]"><div className="flex flex-col gap-3">{data.inquiries.map((inquiry) => <InquiryRow key={inquiry.id} inquiry={inquiry} selected={selected?.id === inquiry.id} onSelect={() => setSelected(inquiry)} onChange={load} />)}</div><InquiryDetail inquiry={selected} onChange={load} /></div> : <Empty title="No inquiries found" description="New portal inquiries will appear here." />}
     {data.pagination.totalPages > 1 ? <nav aria-label="Inquiry pagination" className="flex items-center justify-between"><Button variant="outline" disabled={page <= 1} onClick={() => setPage(page - 1)}>Previous</Button><span className="text-sm text-muted-foreground">Page {page} of {data.pagination.totalPages}</span><Button variant="outline" disabled={page >= data.pagination.totalPages} onClick={() => setPage(page + 1)}>Next</Button></nav> : null}
   </div>;
