@@ -285,3 +285,65 @@ export type AgentTransactionTemplate = {
   description: string;
   milestones: Array<{ key: string; label: string; required: boolean; sortOrder: number }>;
 };
+
+export type AgentTransactionDocument = {
+  id: string;
+  label: string;
+  status: string;
+  notes?: string | null;
+  matchedAt?: string | null;
+  driveFileId?: string | null;
+  driveWebLink?: string | null;
+  documentDefinition?: { key: string; label: string; required: boolean; sortOrder: number } | null;
+  matchedAttachment?: {
+    id: string;
+    filename: string;
+    mimeType: string;
+    sizeBytes: number | null;
+    suggestedDocType?: string | null;
+    suggestedConfidence?: number | null;
+    message?: { id: string; subject: string | null; sentAt: string | null };
+  } | null;
+};
+
+export type AgentTransactionAttachment = {
+  id: string;
+  filename: string;
+  mimeType: string;
+  sizeBytes: number | null;
+  suggestedDocType: string | null;
+  suggestedConfidence: number | null;
+  isMatched: boolean;
+  message: { id: string; subject: string | null; sentAt: string | null };
+};
+
+export type AgentSyncRun = {
+  id: string;
+  status: string;
+  query: string | null;
+  messagesFound: number;
+  error: string | null;
+  startedAt: string;
+  completedAt: string | null;
+};
+
+export type AgentDiscoveredMessage = {
+  id: string;
+  subject: string | null;
+  snippet: string | null;
+  fromEmail: string | null;
+  fromName: string | null;
+  sentAt: string | null;
+  category: string | null;
+  confidence: number | null;
+  status: string;
+  attachments: Array<{
+    id: string;
+    filename: string;
+    mimeType: string;
+    sizeBytes: number | null;
+    suggestedDocType: string | null;
+    suggestedConfidence: number | null;
+    matchedDocument?: { id: string; label: string; status: string } | null;
+  }>;
+};
