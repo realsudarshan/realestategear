@@ -6,6 +6,7 @@ import { SiteFooter } from "@/components/site-footer";
 import { PageHero } from "@/components/page-hero";
 import { LoginForm } from "@/components/login-form";
 import { getSessionUser } from "@/lib/session-user-server";
+import { completeAgentGoogleCallback } from "@/lib/agent-oauth";
 import { safePath } from "@/lib/safe-path";
 
 const siteName = process.env.NEXT_PUBLIC_SITE_NAME || "Example Realty";
@@ -18,10 +19,13 @@ export const metadata: Metadata = {
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ from?: string }>;
+  searchParams: Promise<{ from?: string; oauth?: string; token?: string; redirect?: string; google_error?: string }>;
 }) {
+  const params = await searchParams;
+  await completeAgentGoogleCallback(params);
+
   const user = await getSessionUser();
-  if (user) redirect(safePath((await searchParams).from));
+  if (user) redirect(safePath(params.from));
 
   return (
     <>

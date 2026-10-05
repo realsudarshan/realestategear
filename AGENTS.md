@@ -36,6 +36,7 @@
 - Portal: <http://localhost:3006>. API: <http://localhost:3001>.
 - `apps/portal` rewrites same-origin `/api/:path*` requests to `NEXT_PUBLIC_API_URL` or the local API fallback. Authenticated portal requests use its server-side proxy and httpOnly session cookie.
 - `FRONTEND_URL` is the canonical portal origin used by the API for links and callbacks. Local examples must use port 3006.
+- Agent workspace UI lives at `/agent` on the portal. `AGENT_HQ_URL` must match the API Google OAuth allowlist; in this kit set it to the portal origin so agent Google sign-in returns to `/login`.
 - API-specific variables belong in `apps/api/.env` or the API service environment.
 - Leave `TYPESENSE_HOST` unset for PostgreSQL search. Set `REDIS_ENABLED=false`
   to run without Redis.

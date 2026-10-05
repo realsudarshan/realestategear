@@ -1,8 +1,9 @@
 import { resolveServerApiBaseUrl } from "@realestategear/api-client";
 import { AGENT_HOME, safeAgentPath } from "./agent";
 
+/** Must match `resolveOAuthCallbackBase('agent')` on the API. */
 export function agentCallbackBase(env: NodeJS.ProcessEnv = process.env): string {
-  return (env.AGENT_HQ_URL || env.FRONTEND_URL || "http://localhost:3006").replace(/\/$/, "");
+  return (env.AGENT_HQ_URL || "http://localhost:3002").replace(/\/$/, "");
 }
 
 export function agentGoogleStartUrl(returnTo: string, env: NodeJS.ProcessEnv = process.env): string {

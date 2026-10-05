@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { loadAgentSession } from "@/lib/agent-session";
-import { AGENT_HOME, AGENT_LOGIN, resolveAgentRouteRedirect, safeAgentPath } from "@/lib/agent";
+import { AGENT_HOME, AGENT_LOGIN, resolveAgentRouteRedirect } from "@/lib/agent";
 import { AgentApiDisabled } from "@/components/agent/agent-api-disabled";
 import { AgentShell } from "@/components/agent/agent-shell";
 
