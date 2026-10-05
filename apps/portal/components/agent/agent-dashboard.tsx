@@ -11,6 +11,7 @@ import {
   AGENT_API_DISABLED_CODE,
   formatAgentApiError,
   isAgentApiDisabled,
+  isAgentDashboardData,
   isDashboardEmpty,
   type AgentApiErrorBody,
   type AgentDashboardData,
@@ -64,17 +65,13 @@ export function AgentDashboard() {
         });
         return;
       }
-      if (!body.stats || !Array.isArray(body.recentContacts) || !Array.isArray(body.upcomingTasks)) {
+      if (!isAgentDashboardData(body)) {
         setState({ kind: "error", status: res.status, message: "Unexpected dashboard response." });
         return;
       }
       setState({
         kind: "ready",
-        data: {
-          stats: body.stats,
-          recentContacts: body.recentContacts,
-          upcomingTasks: body.upcomingTasks,
-        },
+        data: body,
       });
     } catch {
       setState({ kind: "error", status: 0, message: "Unable to connect to server" });

@@ -84,6 +84,17 @@ describe("AgentDashboard", () => {
     expect(screen.getByText("No upcoming tasks")).toBeInTheDocument();
   });
 
+  it("does not render an incomplete dashboard payload", async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({ stats: {}, recentContacts: [], upcomingTasks: [] }),
+    });
+    render(<AgentDashboard />);
+    await waitFor(() => expect(screen.getByText("Unexpected dashboard response.")).toBeInTheDocument());
+    expect(screen.queryByText("Active contacts")).not.toBeInTheDocument();
+  });
+
   it("sends unauthorized visitors to login", async () => {
     fetchMock.mockResolvedValueOnce({ ok: false, status: 401, json: async () => ({ error: "Unauthorized" }) });
     render(<AgentDashboard />);

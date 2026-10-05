@@ -127,6 +127,50 @@ export type AgentDashboardData = {
   upcomingTasks: AgentDashboardTask[];
 };
 
+export function isAgentDashboardData(value: unknown): value is AgentDashboardData {
+  if (!value || typeof value !== "object") return false;
+  const data = value as Partial<AgentDashboardData>;
+  const stats = data.stats;
+  if (!stats || typeof stats !== "object") return false;
+
+  const statKeys: (keyof AgentDashboardStats)[] = [
+    "activeContacts",
+    "openTransactions",
+    "pendingTasks",
+    "closedThisMonth",
+  ];
+  if (statKeys.some((key) => typeof stats[key] !== "number" || !Number.isFinite(stats[key]))) {
+    return false;
+  }
+
+  if (!Array.isArray(data.recentContacts) || !Array.isArray(data.upcomingTasks)) return false;
+  return (
+    data.recentContacts.every((contact) => {
+      if (!contact || typeof contact !== "object") return false;
+      return (
+        typeof contact.id === "string" &&
+        (contact.firstName === null || typeof contact.firstName === "string") &&
+        (contact.lastName === null || typeof contact.lastName === "string") &&
+        (contact.type === null || typeof contact.type === "string") &&
+        (contact.stage === null || typeof contact.stage === "string") &&
+        (contact.email === null || typeof contact.email === "string") &&
+        (contact.phone === null || typeof contact.phone === "string") &&
+        typeof contact.createdAt === "string"
+      );
+    }) &&
+    data.upcomingTasks.every((task) => {
+      if (!task || typeof task !== "object") return false;
+      return (
+        typeof task.id === "string" &&
+        typeof task.title === "string" &&
+        (task.dueDate === null || typeof task.dueDate === "string") &&
+        (task.priority === null || typeof task.priority === "string") &&
+        typeof task.status === "string"
+      );
+    })
+  );
+}
+
 export function isDashboardEmpty(data: AgentDashboardData): boolean {
   return (
     data.stats.activeContacts === 0 &&
@@ -137,3 +181,66 @@ export function isDashboardEmpty(data: AgentDashboardData): boolean {
     data.upcomingTasks.length === 0
   );
 }
+
+export type AgentContactTrack = {
+  id?: string;
+  side: string;
+  stage: string;
+  isActive: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export type AgentContact = {
+  id: string;
+  accountId?: string;
+  type: string;
+  firstName: string;
+  lastName: string;
+  email: string | null;
+  phone: string | null;
+  company: string | null;
+  source: string | null;
+  stage: string;
+  tags: string[] | null;
+  avatarUrl?: string | null;
+  userId?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  buyerTrack?: AgentContactTrack | null;
+  sellerTrack?: AgentContactTrack | null;
+  tracks?: AgentContactTrack[];
+  lastContactAt?: string | null;
+  lastConsultAt?: string | null;
+  lastEventAt?: string | null;
+  user?: {
+    id: string;
+    email: string;
+    firstName: string | null;
+    lastName: string | null;
+    _count?: { favorites: number; inquiries: number; savedSearches: number };
+  } | null;
+  interactions?: AgentInteraction[];
+  transactionParties?: Array<{ transaction: Record<string, unknown> }>;
+  tasks?: Array<Record<string, unknown>>;
+  notes?: Array<Record<string, unknown>>;
+  eventAttendees?: Array<{ event: Record<string, unknown> }>;
+};
+
+export type AgentInteraction = {
+  id: string;
+  contactId: string;
+  type: string;
+  side: string | null;
+  subject: string | null;
+  body: string | null;
+  occurredAt: string;
+  duration: number | null;
+  createdAt: string;
+};
+
+export type AgentContactListResponse = {
+  contacts: AgentContact[];
+  pagination: { page: number; limit: number; total: number; totalPages: number };
+  lifecycleCounts: { prospect: number; activeLead: number; client: number; vendor: number };
+};
