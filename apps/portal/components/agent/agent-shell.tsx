@@ -8,6 +8,7 @@ const NAV = [
   { href: "/agent/contacts", label: "Contacts" },
   { href: "/agent/properties", label: "Properties" },
   { href: "/agent/listings", label: "Listings" },
+  { href: "/agent/portals", label: "Portals" },
   { href: "/agent/transactions", label: "Transactions" },
   { href: "/agent/tasks", label: "Tasks" },
   { href: "/agent/events", label: "Calendar" },
