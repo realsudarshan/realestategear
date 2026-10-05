@@ -52,11 +52,11 @@ export async function completeAgentGoogleCallback(params: {
   if (params.oauth !== "google" || !params.token) return;
 
   const result = await establishAgentSessionFromToken(params.token);
-  if (result.ok) {
+  if (result.ok === true) {
     redirect(safeAgentPath(params.redirect) || AGENT_HOME);
   }
-  if (result.status === 403) return;
-  if (isAgentReturnPath(params.redirect) || result.status === 404) {
+  if (result.ok === false && result.status === 403) return;
+  if (result.ok === false && (isAgentReturnPath(params.redirect) || result.status === 404)) {
     redirect(`${AGENT_LOGIN}?google_error=oauth_failed`);
   }
 }

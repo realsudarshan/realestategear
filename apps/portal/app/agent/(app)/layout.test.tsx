@@ -9,7 +9,7 @@ vi.mock("@/components/agent/agent-shell", () => ({
   AgentShell: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }));
 vi.mock("@/components/agent/agent-api-disabled", () => ({
-  AgentApiDisabled: () => <div>Agent API is disabled</div>,
+  AgentApiDisabled: "span",
 }));
 
 describe("Agent protected layout", () => {
@@ -27,6 +27,7 @@ describe("Agent protected layout", () => {
     loadAgentSession.mockResolvedValue({ status: "disabled" });
     const { default: Layout } = await import("./layout");
     const ui = await Layout({ children: <p>secret</p> });
-    expect(JSON.stringify(ui)).toContain("Agent API is disabled");
+    const disabledState = ui as React.ReactElement<{ children?: React.ReactElement }>;
+    expect(disabledState.props.children?.type).toBe("span");
   });
 });

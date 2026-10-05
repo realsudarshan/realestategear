@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
   }
 
   const result = await establishAgentSessionFromToken(token);
-  if (!result.ok) {
+  if (result.ok === false) {
     return NextResponse.json({ error: result.error }, { status: result.status });
   }
   return NextResponse.json({ ok: true, user: result.user });
