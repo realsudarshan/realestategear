@@ -244,3 +244,44 @@ export type AgentContactListResponse = {
   pagination: { page: number; limit: number; total: number; totalPages: number };
   lifecycleCounts: { prospect: number; activeLead: number; client: number; vendor: number };
 };
+
+export type AgentTransactionParty = {
+  id?: string;
+  contactId: string;
+  role: string;
+  contact: { id: string; firstName: string; lastName: string; email?: string | null; phone?: string | null };
+};
+
+export type AgentTransaction = {
+  id: string;
+  type: string;
+  stage: string;
+  address: string | null;
+  mlsId?: string | null;
+  listPrice: number | string | null;
+  salePrice?: number | string | null;
+  commissionRate: number | null;
+  closingDate: string | null;
+  notes: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+  parties: AgentTransactionParty[];
+  property?: { id: string; address: string; city: string; state: string; listings?: Array<Record<string, unknown>> } | null;
+  milestones?: Array<{ id: string; date: string; milestoneDefinition: { key: string; label: string; required: boolean } }>;
+  tasks?: Array<{ id: string; title: string; dueDate: string | null; status: string; priority: string }>;
+  transactionNotes?: Array<{ id: string; body: string; createdAt: string }>;
+  events?: Array<Record<string, unknown>>;
+  documents?: Array<Record<string, unknown>>;
+};
+
+export type AgentTransactionListResponse = {
+  transactions: AgentTransaction[];
+  pagination: { page: number; limit: number; total: number; totalPages: number };
+};
+
+export type AgentTransactionTemplate = {
+  key: string;
+  name: string;
+  description: string;
+  milestones: Array<{ key: string; label: string; required: boolean; sortOrder: number }>;
+};
