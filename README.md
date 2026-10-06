@@ -4,7 +4,12 @@
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6?logo=typescript)
 ![License](https://img.shields.io/badge/License-MIT-yellow)
 
-An end-to-end real estate operating platform for agents, brokerages, and the public.
+**Repository**: https://github.com/realsudarshan/realestategear  
+**Live Demo**: https://realestategear-portal.onrender.com (🚧 Building in progress)
+
+## Description
+
+Real Estate Gear is a self-hostable, full-stack real estate operating system built with Node.js, TypeScript, Next.js, and PostgreSQL. It provides a complete agent workspace with CRM, transaction management, AI-powered workflows, and MLS integration, alongside a customer-facing property portal for listing search and inquiries. Designed for real estate professionals who want full control over their data and branding without SaaS dependencies.
 
 ## Overview
 
