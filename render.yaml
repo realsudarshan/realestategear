@@ -4,7 +4,7 @@ services:
     runtime: node
     region: oregon
     plan: free
-    buildCommand: npm ci && npm run build --workspace=db
+    buildCommand: npm ci --include=dev && npm run build --workspace=db
     startCommand: npm start --workspace=api
     healthCheckPath: /health
     envVars:
@@ -40,7 +40,7 @@ services:
     runtime: node
     region: oregon
     plan: free
-    buildCommand: npm ci && npm run build --workspace=portal
+    buildCommand: npm ci --include=dev && npm run build --workspace=portal
     startCommand: npm start --workspace=portal
     healthCheckPath: /
     envVars:
