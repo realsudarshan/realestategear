@@ -74,5 +74,8 @@ npm run typecheck:portal
 npm run typecheck:mls
 ```
 
-For package publishing checks, use Node `22.14.0` or newer.
+For Agent frontend setup, route/API mapping, integration configuration,
+deployment, limitations, and troubleshooting, see
+[`docs/AGENT-FRONTEND.md`](docs/AGENT-FRONTEND.md).
 
+For package publishing checks, use Node `22.14.0` or newer.
