@@ -29,7 +29,18 @@ services:
           name: realestategear-portal
           property: host
       - key: AGENT_API_ENABLED
-        value: "false"
+        value: "true"
+      - key: AGENT_HQ_URL
+        fromService:
+          type: web
+          name: realestategear-portal
+          property: host
+      - key: GOOGLE_WEB_CLIENT_ID
+        sync: false
+      - key: GOOGLE_WEB_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_WEB_REDIRECT_URI
+        value: https://realestategear-api.onrender.com/api/auth/google/callback
       - key: MLS_PUBLIC_DISPLAY_ENABLED
         value: "false"
       - key: REDIS_ENABLED
