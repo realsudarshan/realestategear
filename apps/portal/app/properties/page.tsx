@@ -3,7 +3,6 @@ import type { Metadata } from "next";
 import { Button } from "@realestategear/ui/button";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
-import { PageHero } from "@/components/page-hero";
 import { PropertySearchForm } from "@/components/property-search-form";
 import { PropertyCard } from "@/components/property-card";
 import { getPortalListings } from "@/lib/listings";
@@ -91,13 +90,13 @@ export default async function PropertiesPage({
   return (
     <>
       <SiteHeader />
-      <main className="bg-background">
-        <PageHero
-          eyebrow="Properties"
-          title="Find your next home"
-          subtitle="Search active listings in our coverage area."
-        />
-        <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6">
+      <main className="min-h-screen bg-background">
+        <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6">
+          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Properties</p>
+          <div className="mb-8">
+            <h1 className="text-2xl font-semibold tracking-tight">Find your next home</h1>
+            <p className="mt-1 text-sm text-muted-foreground">Search active listings in our coverage area.</p>
+          </div>
           {!readiness.canShowSearch ? (
             // Same gated-state pattern as app/communities/[slug]/page.tsx.
             <div className="rounded-md border border-border bg-secondary/40 p-6">

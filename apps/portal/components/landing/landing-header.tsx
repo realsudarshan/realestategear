@@ -12,10 +12,11 @@ export function LandingHeader() {
             <a href="#portal">Agent website</a>
             <a href="#developers">Developers</a>
             <a href="/properties">Browse listings</a>
-            <a href="/login">Log in</a>
-            <a href="/agent/login">Agent sign in</a>
           </div>
-          <a className="nav-cta" href="/join">Create account</a>
+          <div className="nav-cta-group">
+            <a className="nav-cta" href="/join">User signup</a>
+            <a className="nav-cta nav-cta-secondary" href="/agent/register">Agent signup</a>
+          </div>
         </nav>
 
         <div className="hero-grid">
@@ -24,8 +25,8 @@ export function LandingHeader() {
             <h1>Listings, relationships, deals and <em>AI actions.</em></h1>
             <p className="lead">One workspace for agents: manage contacts, discover listings, move transactions forward, publish a branded portal, and review AI-suggested work before it acts.</p>
             <div className="hero-actions">
-              <a className="btn" href="/join">Get started</a>
-              <a className="btn btn-ghost" href="/agent/login">Agent workspace</a>
+              <a className="btn" href="/join">User signup</a>
+              <a className="btn btn-ghost" href="/agent/register">Agent signup</a>
             </div>
             <div className="hero-tags" aria-label="Core capabilities">
               {['CRM', 'Listings & MLS', 'Transactions', 'Portals', 'AI workflows'].map((item) => <span key={item}>{item}</span>)}

@@ -8,9 +8,8 @@ export function LandingFooter() {
         <p className="eyebrow">ONE WORKSPACE</p>
         <h2>Keep the whole practice moving.</h2>
         <div className="hero-actions" style={{ justifyContent: 'center' }}>
-          <a className="btn" href="/join">Create an account</a>
-          <a className="btn btn-ghost" href="/login" style={{ color: 'var(--ink)', boxShadow: 'inset 0 0 0 1px var(--line)' }}>Buyer log in</a>
-          <a className="btn" href="/agent/login" style={{ background: 'var(--night)', color: 'var(--chalk)' }}>Agent sign in</a>
+          <a className="btn" href="/join">User signup</a>
+          <a className="btn btn-ghost" href="/agent/register" style={{ color: 'var(--ink)', boxShadow: 'inset 0 0 0 1px var(--line)' }}>Agent signup</a>
         </div>
         <div className="footer-bottom"><LandingLogo /><small>Express · Postgres · Prisma</small></div>
       </div>

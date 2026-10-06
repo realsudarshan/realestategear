@@ -63,7 +63,10 @@ p{margin:0}
 .nav-links{display:flex;align-items:center;gap:26px;margin-left:auto}
 .nav-links a{font-size:14px;color:#c5d3d2;text-decoration:none;transition:color .18s ease}
 .nav-links a:hover{color:white}
+.nav-cta-group{display:flex;align-items:center;gap:10px;margin-left:auto}
 .nav-cta{display:inline-flex;padding:9px 15px;border-radius:999px;text-decoration:none;font-size:14px;font-weight:700;color:var(--night);background:var(--accent)}
+.nav-cta-secondary{display:inline-flex;padding:9px 15px;border-radius:999px;text-decoration:none;font-size:14px;font-weight:700;color:var(--chalk);background:transparent;border:1px solid rgba(255,255,255,.26);transition:background .18s ease,border-color .18s ease}
+.nav-cta-secondary:hover{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.4)}
 
 .hero-grid{position:relative;z-index:1;display:grid;grid-template-columns:1.02fr .98fr;align-items:center;gap:32px;padding:88px 0 14px}
 .hero-copy{padding-bottom:8px}

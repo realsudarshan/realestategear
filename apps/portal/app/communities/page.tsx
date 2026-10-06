@@ -19,20 +19,13 @@ export default function CommunitiesPage() {
   return (
     <>
       <SiteHeader />
-      <main className="bg-background">
-        <section className="border-b border-border bg-primary text-primary-foreground">
-          <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6">
-            <p className="text-xs font-semibold uppercase tracking-widest text-primary-foreground/60">
-              Your area
-            </p>
-            <h1 className="mt-2 text-3xl font-black tracking-tight sm:text-4xl">Golf communities</h1>
-            <p className="mt-3 max-w-2xl text-primary-foreground/80">
-              The neighborhoods, clubs, and courses we cover.
-            </p>
+      <main className="min-h-screen bg-background">
+        <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6">
+          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Your area</p>
+          <div className="mb-8">
+            <h1 className="text-2xl font-semibold tracking-tight">Golf communities</h1>
+            <p className="mt-1 text-sm text-muted-foreground">The neighborhoods, clubs, and courses we cover.</p>
           </div>
-        </section>
-
-        <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6">
           {SUB_AREAS.map((area) => {
             const inArea = communities.filter((c) => c.subArea === area);
             if (inArea.length === 0) return null;

@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
-import { PageHero } from "@/components/page-hero";
 import { InquiryForm } from "@/components/inquiry-form";
 import { getCommunities } from "@/lib/communities";
 
@@ -19,14 +18,14 @@ export default async function ContactPage({ searchParams }: { searchParams: Prom
   return (
     <>
       <SiteHeader />
-      <main className="bg-background">
-        <PageHero
-          eyebrow="Contact"
-          title="Connect with a Specialist"
-          subtitle="Share your preferences with us and a dedicated advisor will reach out — typically within 24 hours."
-        />
-        <div className="mx-auto max-w-3xl px-5 py-16 sm:px-8">
-          <div className="rounded-xl border border-border bg-card p-8 shadow-sm">
+      <main className="min-h-screen bg-background">
+        <div className="mx-auto max-w-3xl px-4 py-16 sm:px-6">
+          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Contact</p>
+          <div className="mb-8">
+            <h1 className="text-2xl font-semibold tracking-tight">Connect with a Specialist</h1>
+            <p className="mt-1 text-sm text-muted-foreground">Share your preferences with us and a dedicated advisor will reach out — typically within 24 hours.</p>
+          </div>
+          <div className="rounded-md border border-border bg-card p-6">
             <InquiryForm communities={communityNames} areaSlug={attribution.area} collectionSlug={attribution.collection} />
           </div>
           <p className="mt-8 text-center text-xs font-medium uppercase tracking-widest text-muted-foreground/80">
