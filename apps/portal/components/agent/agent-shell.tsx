@@ -12,6 +12,8 @@ const NAV = [
   { href: "/agent/mls", label: "MLS verification" },
   { href: "/agent/reports", label: "Reports" },
   { href: "/agent/campaigns", label: "Campaigns" },
+  { href: "/agent/ai", label: "AI workspace" },
+  { href: "/agent/google", label: "Google Workspace" },
   { href: "/agent/segments", label: "Collections" },
   { href: "/agent/transactions", label: "Transactions" },
   { href: "/agent/tasks", label: "Tasks" },
