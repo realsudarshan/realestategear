@@ -12,7 +12,7 @@
     "pretest": "npm run build:shared",
     "gen:theme": "tsx scripts/gen-theme.mts",
     "dev": "npm run gen:theme && next dev --port 3006",
-    "build": "npm run gen:theme && NEXT_IGNORE_INCORRECT_LOCKFILE=1 next build",
+    "build": "npm run gen:theme && node scripts/build.mjs",
     "start": "node scripts/start-standalone.mjs 3006",
     "start:e2e": "node scripts/start-standalone.mjs 3106",
     "typecheck": "tsc --project tsconfig.json --pretty false",

@@ -2,9 +2,13 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { push, refresh } = vi.hoisted(() => ({ push: vi.fn(), refresh: vi.fn() }));
+const { push, refresh, router } = vi.hoisted(() => {
+  const push = vi.fn();
+  const refresh = vi.fn();
+  return { push, refresh, router: { push, refresh } };
+});
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({ push, refresh }),
+  useRouter: () => router,
 }));
 
 const { AgentDashboard } = await import("./agent-dashboard");

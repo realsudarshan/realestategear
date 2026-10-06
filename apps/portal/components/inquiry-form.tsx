@@ -109,7 +109,7 @@ export function InquiryForm({
 
       <div className="mt-2 flex flex-col items-start gap-4 sm:flex-row sm:items-center">
         <Button type="submit" variant="gold" size="lg" loading={pending} loadingLabel="Sending...">
-          Submit Inquiry
+          Request a callback
         </Button>
         <p className="text-xs font-medium text-muted-foreground/80">
           Your information is strictly used for real estate inquiries. No unwanted emails.

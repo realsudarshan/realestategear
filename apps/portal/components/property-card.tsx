@@ -71,13 +71,13 @@ export function PropertyCard({ property }: { property: PortalPropertySummary }) 
               {property.bedrooms != null && (
                 <span className="flex items-center gap-1">
                   <BedDouble className="size-3.5 shrink-0" />
-                  {property.bedrooms}
+                  {property.bedrooms} bd
                 </span>
               )}
               {property.bathrooms != null && (
                 <span className="flex items-center gap-1">
                   <Bath className="size-3.5 shrink-0" />
-                  {property.bathrooms}
+                  {property.bathrooms} ba
                 </span>
               )}
               {property.squareFeet != null && (

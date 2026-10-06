@@ -109,7 +109,7 @@ describe("Agent transaction CRM", () => {
       json: async () => url.endsWith("/contacts?limit=100") ? { contacts: [{ id: "c2", firstName: "Alex", lastName: "Seller" }] } : transaction,
     }));
     fireEvent.change(screen.getByRole("combobox", { name: "Contact" }), { target: { value: "c2" } });
-    fireEvent.click(screen.getByRole("button", { name: "Add" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add party" }));
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/agent/transactions/t1/parties", expect.objectContaining({ method: "POST" })));
 
     fetchMock.mockResolvedValueOnce({ ok: true, status: 204, json: async () => ({}) });
