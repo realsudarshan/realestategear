@@ -218,7 +218,7 @@ export const startServer = async () => {
 
   await ensureBootstrapAdmin();
 
-  const port = process.env.API_PORT || 3001;
+  const port = process.env.PORT || process.env.API_PORT || 3001;
   app.listen(port, () => {
     logger.info(`🚀 API Server running on port ${port}`);
     logger.info(`📊 Health check available at http://localhost:${port}/health`);

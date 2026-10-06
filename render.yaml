@@ -1,0 +1,80 @@
+services:
+  - type: web
+    name: realestategear-api
+    runtime: node
+    region: oregon
+    plan: free
+    buildCommand: npm ci --include=dev && npm run build --workspace=db
+    startCommand: npm run db:migrate --workspace=db && npm start --workspace=api
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: realestategear-db
+          property: connectionString
+      - key: JWT_SECRET
+        sync: false
+      - key: JWT_EXPIRES_IN
+        value: 7d
+      - key: FRONTEND_URL
+        fromService:
+          type: web
+          name: realestategear-portal
+          property: host
+      - key: ALLOWED_ORIGINS
+        fromService:
+          type: web
+          name: realestategear-portal
+          property: host
+      - key: AGENT_API_ENABLED
+        value: "true"
+      - key: AGENT_HQ_URL
+        fromService:
+          type: web
+          name: realestategear-portal
+          property: host
+      - key: GOOGLE_WEB_CLIENT_ID
+        sync: false
+      - key: GOOGLE_WEB_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_WEB_REDIRECT_URI
+        value: https://realestategear-api.onrender.com/api/auth/google/callback
+      - key: MLS_PUBLIC_DISPLAY_ENABLED
+        value: "false"
+      - key: REDIS_ENABLED
+        value: "false"
+
+  - type: web
+    name: realestategear-portal
+    runtime: node
+    region: oregon
+    plan: free
+    buildCommand: npm ci --include=dev && npm run build --workspace=portal
+    startCommand: npm start --workspace=portal
+    healthCheckPath: /
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NEXT_PUBLIC_API_URL
+        value: https://realestategear-api.onrender.com
+      - key: API_INTERNAL_URL
+        value: https://realestategear-api.onrender.com
+      - key: FRONTEND_URL
+        fromService:
+          type: web
+          name: realestategear-portal
+          property: host
+      - key: AGENT_HQ_URL
+        fromService:
+          type: web
+          name: realestategear-portal
+          property: host
+
+databases:
+  - name: realestategear-db
+    databaseName: realestategear
+    user: realestategear
+    region: oregon
+    plan: free
