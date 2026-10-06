@@ -5,3 +5,6 @@
 /* Tailwind ignores dependencies by default, so consumers explicitly register
  * the shared component package as a class source. */
 @source "../../../packages/ui/src";
+
+/* Landing page styles imported from realestate-gear-react */
+@import './landing.css';
