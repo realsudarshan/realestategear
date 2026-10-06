@@ -66,6 +66,11 @@ services:
           type: web
           name: realestategear-portal
           property: host
+      - key: AGENT_HQ_URL
+        fromService:
+          type: web
+          name: realestategear-portal
+          property: host
 
 databases:
   - name: realestategear-db
