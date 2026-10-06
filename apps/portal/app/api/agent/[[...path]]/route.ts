@@ -29,7 +29,7 @@ async function forward(request: NextRequest, params: { path?: string[] }) {
     body: body || undefined,
     headers: { "Content-Type": request.headers.get("content-type") ?? "application/json" },
   });
-  return new NextResponse(await response.text(), {
+  return new NextResponse(response.body, {
     status: response.status,
     headers: { "Content-Type": response.headers.get("content-type") ?? "application/json" },
   });
