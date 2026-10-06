@@ -18,5 +18,5 @@ await Promise.all([
 ]);
 
 process.env.PORT = port;
-process.env.HOSTNAME ??= "0.0.0.0";
+process.env.HOSTNAME = "0.0.0.0";
 await import(pathToFileURL(resolve(standaloneRoot, "server.js")).href);
