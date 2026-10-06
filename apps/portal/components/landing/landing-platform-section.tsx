@@ -3,11 +3,24 @@
 import { useState } from "react"
 import { floors } from "./data/content"
 
+const FLOOR_TOP = 8
+const FLOOR_STEP = 12.75
+const FLOOR_HEIGHT = 12.3
+const FEATHER = 3.2
+
 export default function LandingPlatformSection() {
   const [active, setActive] = useState<number>(0)
+  const [hovered, setHovered] = useState<number | null>(null)
+  const index = hovered ?? active
+
+  const floorY = FLOOR_TOP + index * FLOOR_STEP
+  const floorBottom = floorY + FLOOR_HEIGHT
+  const glowTop = FLOOR_TOP - 0.3 + index * FLOOR_STEP
+
+  const maskVertical = `linear-gradient(to bottom, transparent ${Math.max(0, floorY - FEATHER)}%, #000 ${floorY}%, #000 ${floorBottom}%, transparent ${Math.min(100, floorBottom + FEATHER)}%)`
 
   return (
-    <section id="platform" className="platform-section">
+    <section id="platform" className="platform-section dark-section">
       <div className="wrap">
         <div className="section-heading">
           <p className="eyebrow">THE PLATFORM</p>
@@ -17,17 +30,34 @@ export default function LandingPlatformSection() {
 
         <div className="platform-grid">
           <div className="building-frame">
-            <img src="/art/building-six-floors-cutaway.svg" alt="Six-floor real-estate platform illustration" />
-            <span className="building-active" style={{ top: `${17 + active * 12.8}%` }} aria-hidden="true" />
+            <div className="building-stage">
+              <img className="building-base" src="/art/building-six-floors-cutaway.svg" alt="Six-floor real-estate platform illustration" />
+              <img
+                className="building-light"
+                src="/art/building-six-floors-cutaway.svg"
+                alt=""
+                aria-hidden="true"
+                style={{
+                  maskImage: maskVertical,
+                  WebkitMaskImage: maskVertical,
+                }}
+              />
+              <span className="building-glow" style={{ top: `${glowTop}%` }} aria-hidden="true" />
+            </div>
           </div>
 
           <div className="platform-list">
-            {floors.map((floor, index) => {
-              const open = active === index
+            {floors.map((floor, i) => {
+              const open = active === i
               return (
-                <div className={`floor-row ${open ? "open" : ""}`} key={floor.name}>
-                  <button type="button" onClick={() => setActive(index)} aria-expanded={open}>
-                    <span className="floor-number">0{index + 1}</span>
+                <div
+                  className={`floor-row ${open ? "open" : ""} ${index === i ? "highlighted" : ""}`}
+                  key={floor.name}
+                  onMouseEnter={() => setHovered(i)}
+                  onMouseLeave={() => setHovered(null)}
+                >
+                  <button type="button" onClick={() => setActive(i)} aria-expanded={open}>
+                    <span className="floor-number">0{i + 1}</span>
                     <span className="floor-copy"><b>{floor.name}</b><small>{floor.kicker}</small></span>
                     <span className="floor-arrow">{open ? "−" : "+"}</span>
                   </button>

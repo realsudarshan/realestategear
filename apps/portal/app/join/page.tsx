@@ -32,7 +32,7 @@ export default async function JoinPage({
           title="Create an account"
           subtitle="Save homes and pick up where you left off."
         />
-        <div className="mx-auto max-w-md px-4 py-12 sm:px-6">
+        <div className="mx-auto max-w-md px-4 py-8 sm:px-6 sm:py-10">
           <div className="rounded-md border border-border bg-card p-6">
             <Suspense fallback={null}>
               <JoinForm />

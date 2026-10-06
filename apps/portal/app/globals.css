@@ -2,9 +2,11 @@
 @import "@realestategear/tokens/preset.css";
 @import "./theme.generated.css";
 
+/* Landing page styles imported from realestate-gear-react.
+   Google Fonts (Bricolage Grotesque + Figtree) are loaded via
+   <link> in app/layout.tsx to avoid PostCSS @import ordering errors. */
+@import './landing.css';
+
 /* Tailwind ignores dependencies by default, so consumers explicitly register
  * the shared component package as a class source. */
 @source "../../../packages/ui/src";
-
-/* Landing page styles imported from realestate-gear-react */
-@import './landing.css';
