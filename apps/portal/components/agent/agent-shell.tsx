@@ -1,27 +1,6 @@
-import Link from "next/link";
-import { AgentLogoutButton } from "./agent-logout-button";
 import type { AgentPublicUser } from "@/lib/agent";
-import { AgentSearchPalette } from "./agent-property-discovery";
-
-const NAV = [
-  { href: "/agent", label: "Dashboard" },
-  { href: "/agent/contacts", label: "Contacts" },
-  { href: "/agent/properties", label: "Properties" },
-  { href: "/agent/listings", label: "Listings" },
-  { href: "/agent/portals", label: "Portals" },
-  { href: "/agent/mls", label: "MLS verification" },
-  { href: "/agent/reports", label: "Reports" },
-  { href: "/agent/campaigns", label: "Campaigns" },
-  { href: "/agent/ai", label: "AI workspace" },
-  { href: "/agent/google", label: "Google Workspace" },
-  { href: "/agent/segments", label: "Collections" },
-  { href: "/agent/transactions", label: "Transactions" },
-  { href: "/agent/tasks", label: "Tasks" },
-  { href: "/agent/events", label: "Calendar" },
-  { href: "/agent/notes", label: "Notes" },
-  { href: "/agent/inquiries", label: "Inquiries" },
-  { href: "/agent/settings", label: "Settings" },
-];
+import { AgentLogoutButton } from "./agent-logout-button";
+import { AgentNavigation } from "./agent-navigation";
 
 export function AgentShell({
   user,
@@ -46,19 +25,7 @@ export function AgentShell({
             <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Agent workspace</p>
             <p className="text-sm font-semibold">{name}</p>
           </div>
-          <nav aria-label="Agent" className="flex flex-wrap items-center gap-1">
-            <AgentSearchPalette />
-            {NAV.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className="rounded-md px-3 py-1.5 text-sm font-medium text-muted-foreground hover:bg-accent/40 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                {item.label}
-              </Link>
-            ))}
-            <AgentLogoutButton />
-          </nav>
+          <div className="flex flex-wrap items-center gap-2"><AgentNavigation user={user} /><AgentLogoutButton /></div>
         </div>
       </header>
       <main id="agent-main" className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
