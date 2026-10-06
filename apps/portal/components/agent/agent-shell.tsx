@@ -10,6 +10,7 @@ const NAV = [
   { href: "/agent/listings", label: "Listings" },
   { href: "/agent/portals", label: "Portals" },
   { href: "/agent/mls", label: "MLS verification" },
+  { href: "/agent/reports", label: "Reports" },
   { href: "/agent/segments", label: "Collections" },
   { href: "/agent/transactions", label: "Transactions" },
   { href: "/agent/tasks", label: "Tasks" },
