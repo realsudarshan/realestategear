@@ -58,9 +58,9 @@ services:
       - key: NODE_ENV
         value: production
       - key: NEXT_PUBLIC_API_URL
-        value: http://realestategear-api:10000
+        value: https://realestategear-api.onrender.com
       - key: API_INTERNAL_URL
-        value: http://realestategear-api:10000
+        value: https://realestategear-api.onrender.com
       - key: FRONTEND_URL
         fromService:
           type: web
